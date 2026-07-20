@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1B16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Montberou">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Montberou · Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E1B16; --panel:#15251E; --panel2:#1B2E26;
+  --ink:#EFE9DB; --muted:#8FA69A; --dim:#5C7268;
+  --orange:#FF6B35; --orange-soft:rgba(255,107,53,.14);
+  --moss:#86B49A; --moss-soft:rgba(134,180,154,.12);
+  --amber:#E0A83E;
+  --line:rgba(239,233,219,.08);
+  --disp:"Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body:"Barlow", system-ui, -apple-system, sans-serif;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; padding:0; background:var(--bg); color:var(--ink); font-family:var(--body); font-size:16px}
+body{padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+button{font-family:inherit; color:inherit; background:none; border:none; cursor:pointer}
+button:focus-visible, input:focus-visible, a:focus-visible{outline:2px solid var(--orange); outline-offset:2px; border-radius:6px}
+header{padding:calc(14px + env(safe-area-inset-top)) 18px 0}
+.eyebrow{font-family:var(--disp); font-weight:600; letter-spacing:.14em; text-transform:uppercase; font-size:12px; color:var(--orange)}
+h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:34px; line-height:1; margin:4px 0 2px; letter-spacing:.01em}
+.sub{color:var(--muted); font-size:13.5px; margin:0 0 6px}
+.countdown{display:inline-flex; align-items:baseline; gap:6px; background:var(--orange-soft); border:1px solid rgba(255,107,53,.35); border-radius:999px; padding:4px 12px; margin-top:4px}
+.countdown b{font-family:var(--disp); font-size:20px; font-weight:700; color:var(--orange)}
+.countdown span{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em}
+.profile{margin:14px 6px 4px; position:relative}
+.profile svg{width:100%; height:86px; display:block}
+.wk-dot{cursor:pointer}
+.profile-caption{display:flex; justify-content:space-between; padding:0 14px; font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; font-family:var(--disp)}
+.wknav{display:flex; align-items:center; justify-content:space-between; padding:8px 14px 4px}
+.wknav .title{font-family:var(--disp); font-weight:600; text-transform:uppercase; font-size:19px; letter-spacing:.03em}
+.wknav .meta{font-size:12.5px; color:var(--muted)}
+.arrow{width:40px; height:40px; border-radius:12px; background:var(--panel); border:1px solid var(--line); font-size:18px; color:var(--ink)}
+.arrow:disabled{opacity:.3}
+.days{padding:6px 12px 10px; display:flex; flex-direction:column; gap:8px}
+.day{display:flex; align-items:stretch; background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; text-align:left; width:100%; padding:0}
+.day .bar{width:5px; flex:none}
+.day.qual .bar{background:var(--orange)}
+.day.easy .bar{background:var(--moss)}
+.day.renfo .bar{background:var(--amber)}
+.day.off .bar{background:var(--dim)}
+.day.race .bar{background:var(--orange)}
+.day .datecol{flex:none; width:56px; padding:10px 0 10px 10px; display:flex; flex-direction:column; justify-content:center}
+.day .dow{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:15px}
+.day .dnum{font-size:11.5px; color:var(--muted)}
+.day .main{flex:1; padding:10px 8px 10px 6px; min-width:0}
+.day .stitle{font-weight:600; font-size:14.5px; line-height:1.25}
+.day .schips{display:flex; gap:6px; margin-top:4px; flex-wrap:wrap}
+.chip{font-size:11px; color:var(--muted); background:var(--panel2); border-radius:6px; padding:2px 7px}
+.chip.hot{color:var(--orange); background:var(--orange-soft)}
+.chip.care{color:var(--amber); background:rgba(224,168,62,.12)}
+.day .checkcol{flex:none; display:flex; align-items:center; padding-right:12px}
+.check{width:26px; height:26px; border-radius:50%; border:2px solid var(--dim); display:flex; align-items:center; justify-content:center; font-size:14px; color:transparent; flex:none}
+.day.done{opacity:.55}
+.day.done .check{border-color:var(--moss); background:var(--moss-soft); color:var(--moss)}
+.day.today{border-color:rgba(255,107,53,.5)}
+.day.today .dow{color:var(--orange)}
+.day.race{background:linear-gradient(100deg, rgba(255,107,53,.16), var(--panel) 60%)}
+.day.race .stitle{color:var(--orange); font-family:var(--disp); text-transform:uppercase; font-size:17px; letter-spacing:.03em}
+.overlay{position:fixed; inset:0; background:rgba(4,10,8,.6); backdrop-filter:blur(2px); opacity:0; pointer-events:none; transition:opacity .2s; z-index:40}
+.overlay.open{opacity:1; pointer-events:auto}
+.sheet{position:fixed; left:0; right:0; bottom:0; background:var(--panel2); border-radius:20px 20px 0 0; border-top:1px solid var(--line); z-index:50; transform:translateY(105%); transition:transform .25s ease; max-height:82vh; display:flex; flex-direction:column}
+.sheet.open{transform:translateY(0)}
+@media (prefers-reduced-motion: reduce){ .sheet{transition:none} .overlay{transition:none} }
+.sheet .grab{width:42px; height:4px; border-radius:2px; background:var(--dim); margin:10px auto 0}
+.sheet .shead{padding:10px 18px 8px; border-bottom:1px solid var(--line)}
+.sheet .stag{font-family:var(--disp); font-weight:600; text-transform:uppercase; letter-spacing:.12em; font-size:11.5px; color:var(--orange)}
+.sheet h2{font-family:var(--disp); font-weight:700; text-transform:uppercase; margin:2px 0 6px; font-size:24px; line-height:1.05}
+.sheet .schips{display:flex; gap:6px; flex-wrap:wrap; padding-bottom:4px}
+.sheet .sbody{padding:12px 18px calc(18px + env(safe-area-inset-bottom)); overflow-y:auto}
+.sec{margin-bottom:14px}
+.sec h3{font-family:var(--disp); font-weight:600; text-transform:uppercase; letter-spacing:.1em; font-size:12.5px; color:var(--moss); margin:0 0 6px}
+.sec.warn h3{color:var(--amber)}
+.sec p{margin:0 0 6px; font-size:14.5px; line-height:1.45; color:var(--ink)}
+.sec ul{margin:0; padding-left:0; list-style:none}
+.sec li{font-size:14.5px; line-height:1.4; padding:7px 0; border-bottom:1px dashed var(--line)}
+.sec li:last-child{border-bottom:none}
+.sheet .actions{display:flex; gap:10px; padding:0 18px 8px}
+.btn{flex:1; padding:12px; border-radius:12px; font-weight:600; font-size:15px; text-align:center}
+.btn.primary{background:var(--orange); color:#1A0E06}
+.btn.ghost{background:var(--panel); border:1px solid var(--line)}
+nav.tabs{position:fixed; bottom:0; left:0; right:0; display:flex; background:rgba(14,27,22,.94); backdrop-filter:blur(8px); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:30}
+nav.tabs button{flex:1; padding:12px 0 10px; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--dim); font-family:var(--disp); text-transform:uppercase; letter-spacing:.08em; font-size:12.5px; font-weight:600}
+nav.tabs button.active{color:var(--orange)}
+nav.tabs .ico{font-size:17px; line-height:1}
+.pagepad{padding:6px 14px 10px}
+.race-card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:10px; position:relative}
+.race-card.target{border-color:rgba(255,107,53,.5); background:linear-gradient(120deg, rgba(255,107,53,.12), var(--panel) 55%)}
+.race-card .rdate{font-family:var(--disp); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:12px; color:var(--muted)}
+.race-card h3{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:20px; margin:2px 0 4px}
+.race-card .rchips{display:flex; gap:6px; flex-wrap:wrap}
+.race-card .jj{position:absolute; top:12px; right:12px; font-family:var(--disp); font-weight:700; color:var(--orange); font-size:18px}
+.race-card .rnotes{font-size:13px; color:var(--muted); margin-top:6px}
+.race-card .del{position:absolute; bottom:10px; right:12px; color:var(--dim); font-size:12.5px; text-decoration:underline}
+.addform{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:6px}
+.addform h3{font-family:var(--disp); text-transform:uppercase; font-weight:600; letter-spacing:.08em; font-size:14px; margin:0 0 10px; color:var(--moss)}
+.frow{display:flex; gap:8px; margin-bottom:8px}
+.addform input{flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; color:var(--ink); font-size:14.5px; font-family:var(--body)}
+.addform input::placeholder{color:var(--dim)}
+table.zones{width:100%; border-collapse:collapse; font-size:13.5px}
+table.zones th{font-family:var(--disp); text-transform:uppercase; letter-spacing:.06em; font-weight:600; font-size:12px; color:var(--moss); text-align:left; padding:8px 6px; border-bottom:1px solid var(--line)}
+table.zones td{padding:9px 6px; border-bottom:1px dashed var(--line); vertical-align:top}
+table.zones td b{font-family:var(--disp); font-size:15px; letter-spacing:.02em}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-top:12px}
+.card.care{border-color:rgba(224,168,62,.35)}
+.card h3{font-family:var(--disp); text-transform:uppercase; font-weight:600; letter-spacing:.08em; font-size:13.5px; margin:0 0 8px}
+.card.care h3{color:var(--amber)}
+.card ul{margin:0; padding-left:18px}
+.card li{font-size:13.5px; line-height:1.5; margin-bottom:5px}
+.note{font-size:12.5px; color:var(--muted); line-height:1.45; margin-top:12px}
+.version{font-size:11px; color:var(--dim); text-align:center; padding:16px 0 4px}
+.toast{position:fixed; bottom:calc(78px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line); color:var(--ink); border-radius:999px; padding:8px 16px; font-size:13.5px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:60; white-space:nowrap}
+.toast.show{opacity:1}
+.hidden{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Objectif · podium scratch</div>
+  <h1>Le Montberou</h1>
+  <p class="sub">19 km · 500 m D+ · Montbron · dim. 20 sept, 9h00</p>
+  <div class="countdown"><b id="jj">J-–</b><span>avant la course</span></div>
+</header>
+
+<section id="page-plan">
+  <div class="profile" aria-label="Charge par semaine">
+    <svg id="loadsvg" viewBox="0 0 360 86" preserveAspectRatio="none" role="img" aria-label="Profil de charge : montée jusqu'à la semaine 5 puis affûtage"></svg>
+    <div class="profile-caption"><span>Récup</span><span>Reconstruction</span><span>Pic</span><span>Affûtage</span></div>
+  </div>
+  <div class="wknav">
+    <button class="arrow" id="prevwk" aria-label="Semaine précédente">‹</button>
+    <div style="text-align:center">
+      <div class="title" id="wktitle">S1</div>
+      <div class="meta" id="wkmeta"></div>
+    </div>
+    <button class="arrow" id="nextwk" aria-label="Semaine suivante">›</button>
+  </div>
+  <div class="days" id="days"></div>
+</section>
+
+<section id="page-races" class="pagepad hidden">
+  <div id="racelist"></div>
+  <form class="addform" id="raceform">
+    <h3>Ajouter une course</h3>
+    <div class="frow"><input id="rname" placeholder="Nom de la course" required></div>
+    <div class="frow"><input id="rdate" type="date" required aria-label="Date"></div>
+    <div class="frow"><input id="rdist" placeholder="Distance (km)" inputmode="decimal"><input id="rdplus" placeholder="D+ (m)" inputmode="numeric"></div>
+    <div class="frow"><input id="rnotes" placeholder="Notes (objectif, lieu…)"></div>
+    <button class="btn primary" type="submit" style="width:100%">Ajouter au calendrier</button>
+  </form>
+  <div class="version">Les courses ajoutées sont enregistrées sur cet appareil-compte.</div>
+</section>
+
+<section id="page-zones" class="pagepad hidden">
+  <table class="zones">
+    <thead><tr><th>Zone</th><th>Allure /km</th><th>FC</th></tr></thead>
+    <tbody id="zonesbody"></tbody>
+  </table>
+  <p class="note"><b>La FC commande</b> sur l'easy et le seuil (référence route ; le tapis fausse l'allure GPS). Le VO2 reste calé sur la VMA mesurée. En montée/descente : à l'effort, jamais au chrono.</p>
+  <p class="note">* Allure seuil à confirmer à la séance du <b>mar. 11 août</b> — envoie tes chiffres à Claude, zones et plan recalés ici.</p>
+
+  <div class="card care">
+    <h3>⚠ Points de vigilance — blessures</h3>
+    <ul>
+      <li><b>Achille gauche</b> (feu orange) : RAS à plat, mais à surveiller sur la descente longue. Au 1er signal → footing plat/vélo, on ne force pas.</li>
+      <li><b>Malléole droite</b> : s'installe sur terrain irrégulier / dévers, indolore sur route. Limiter les longues descentes techniques enchaînées.</li>
+      <li><b>Essuie-glace (genou)</b> : pire en montée. Le renfo fessiers/stabilisateurs est ta prévention n°1 — on le garde.</li>
+      <li><b>Règle d'or gym</b> : zéro explosif (saltos, sauts) à moins de 72 h d'une sortie longue — c'est le déclencheur de l'Achille.</li>
+      <li>Décisions Achille + malléole → <b>médecin du sport</b>. Ce plan reste provisoire selon l'état post-Courchevel.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Chaussures</h3>
+    <ul>
+      <li>Footings : Novablast 5 · Fractionné : Adidas Evo SL · Route : Vaporfly 2</li>
+      <li>Trail : pour ménager la malléole, privilégier les plus <b>souples / larges / drop bas</b> (Trabuco Max 2, drop 5) plutôt que les S/Lab Genesis (drop 8, plaque rigide) sur le dévers et les descentes techniques.</li>
+    </ul>
+  </div>
+
+  <p class="note">VMA 19 km/h (oct. 2025) · FCmax 202 · FC repos 43 · 66 kg · moteur aérobie fort · à l'aise plat + descente, point faible = montée.</p>
+</section>
+
+<div class="overlay" id="overlay"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle">
+  <div class="grab"></div>
+  <div class="shead">
+    <div class="stag" id="sheettag"></div>
+    <h2 id="sheettitle"></h2>
+    <div class="schips" id="sheetchips"></div>
+  </div>
+  <div class="sbody" id="sheetbody"></div>
+  <div class="actions">
+    <button class="btn ghost" id="closesheet">Fermer</button>
+    <button class="btn primary" id="togdone">Marquer faite ✓</button>
+  </div>
+</div>
+
+<nav class="tabs">
+  <button id="tab-plan" class="active"><span class="ico">⛰</span>Plan</button>
+  <button id="tab-races"><span class="ico">🏁</span>Courses</button>
+  <button id="tab-zones"><span class="ico">♥</span>Zones</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+<div class="version">Plan v4 · zones FC recalées (FCmax 202) + protocole renfo perso + adaptations blessures · Pour modifier : demande à Claude.</div>
+
+<script>
+const PLAN_V = 4;
+const RACE_DAY = "2026-09-20";
+const WU = "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux) + 3 lignes droites progressives.";
+const CD = "Retour au calme 10 min très easy + hydratation.";
+
+/* Ton protocole prévention (essuie-glace / fessiers / Achille) — tout en CONTRÔLE, zéro explosif */
+const RENFO_PREV = [
+ "Mobilité chevilles + hanches 5 min",
+ "Step-down excentrique 3 × 8 / jambe (contrôle la descente du bassin)",
+ "Split squat sur box 3 × 8 / jambe",
+ "Hip thrust 3 × 10",
+ "Pont fessier unilatéral 3 × 10 / jambe",
+ "Soulevé de terre roumain (RDL) 3 × 8",
+ "Mollets excentriques (heel drops) 3 × 12 / jambe — progressif, selon avis kiné (Achille G)",
+ "Gainage : planche 3 × 45 s + latérale 2 × 30 s / côté"
+];
+const RENFO_LIGHT = [
+ "Gainage complet 8-10 min (planche, latérales, bird-dog)",
+ "Ponts fessiers unilatéraux 2 × 12 / jambe",
+ "Step-down léger 2 × 8 / jambe",
+ "Mollets excentriques 2 × 12 / jambe (léger)",
+ "Haut du corps : pompes 3 × 12, rowing 3 × 12 / bras"
+];
+const RENFO_NOTE = "Renfo = ton pilier anti-essuie-glace (fessiers, TFL, stabilisateurs), à garder même sans douleur. Tout en contrôle, ZÉRO explosif. Mollets excentriques uniquement selon l'avis de ton kiné. 2ᵉ créneau possible le mardi après la séance (version gainage + haut du corps) si tu veux tenir tes 2 séances/sem.";
+
+const WEEKS = [
+ {id:1, label:"S1 · 27 juil → 2 août", phase:"Récupération", km:15, days:[
+  {d:"2026-07-27", t:"off",  title:"Repos complet", det:{"Consigne":["Zéro course. Marche, sommeil, hydratation. On cicatrise du 66 km — priorité absolue vu la charge et l'Achille."]}},
+  {d:"2026-07-28", t:"off",  title:"Repos ou marche", det:{"Consigne":["Marche tranquille possible. Pas de course, pas de vélo appuyé."]}},
+  {d:"2026-07-29", t:"off",  title:"Repos ou marche", det:{"Consigne":["Idem. DOMS et fatigue Achille/malléole normaux après un tel effort — on ne force rien."]}},
+  {d:"2026-07-30", t:"easy", title:"Footing très easy 30-40 min ou vélo 1h", km:7, det:{"Séance":["Option A : 30-40 min footing FC < 145, terrain PLAT et souple (ménage Achille + malléole).","Option B : 1h vélo tranquille (zéro impact, idéal ici)."],"Vigilance":["Si Achille ou malléole parlent → vélo uniquement."]}},
+  {d:"2026-07-31", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
+  {d:"2026-08-01", t:"off",  title:"Repos ou vélo léger", det:{"Consigne":["Vélo très tranquille possible si envie de bouger."]}},
+  {d:"2026-08-02", t:"easy", title:"45 min easy trail roulant", km:8, det:{"Séance":["45 min sensations libres sur trail ROULANT (pas de descente technique). FC < 150.","Aucun objectif d'allure."]}},
+ ]},
+ {id:2, label:"S2 · 3 → 9 août", phase:"Reprise douce", km:40, days:[
+  {d:"2026-08-03", t:"easy", title:"Footing easy 40-50 min", km:9, det:{"Séance":["FC ~145 (≈ 5:15-5:20 sur route)."]}},
+  {d:"2026-08-04", t:"easy", title:"Footing easy 50-60 min + strides", km:11, det:{"Séance":["FC ~145 tout du long.","Fin : 4-5 lignes droites de 15-20 s, rapides et relâchées (pas de sprint sec — Achille), récup marche."]}},
+  {d:"2026-08-05", t:"renfo", title:"Renfo prévention (salle)", det:{"Exercices":RENFO_PREV,"Note":[RENFO_NOTE]}},
+  {d:"2026-08-06", t:"easy", title:"Footing easy 40-50 min + strides", km:9, det:{"Séance":["FC ~145.","Fin : 4-5 strides relâchées."]}},
+  {d:"2026-08-07", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
+  {d:"2026-08-08", t:"off",  title:"Repos ou footing court easy", det:{"Consigne":["Optionnel : 30 min très easy si les jambes sont bien."]}},
+  {d:"2026-08-09", t:"easy", title:"Footing easy 50-60 min", km:11, det:{"Séance":["FC ~145. Dernière semaine sans intensité."]}},
+ ]},
+ {id:3, label:"S3 · 10 → 16 août", phase:"Reconstruction", km:55, days:[
+  {d:"2026-08-10", t:"easy", title:"Footing easy 45-50 min", km:9, det:{"Séance":["FC ~145."]}},
+  {d:"2026-08-11", t:"qual", title:"Seuil · 2 × 10 min — ON CALE L'ALLURE", km:12, fc:"180-188", pace:"~3:45", det:{"Échauffement":[WU],"Corps de séance":["2 × 10 min au seuil : FC 180-188, allure repère ~3:45/km sur plat.","Récup 3 min trot très facile entre les blocs.","Effort « confortablement dur » : phrases courtes possibles, pas plus."],"Retour au calme":[CD],"Important":["1re séance de seuil du bloc → note l'allure réelle tenue à ~184 bpm et envoie-la à Claude : tout le plan sera recalé dessus."]}},
+  {d:"2026-08-12", t:"renfo", title:"Footing easy 40 min + renfo prévention", km:8, det:{"Course":["Footing 40 min FC ~145 (terrain roulant)."],"Exercices (salle)":RENFO_PREV,"Note":["Contrôlé : séance de côtes le lendemain. Si jambes lourdes → gainage + fessiers seulement."]}},
+  {d:"2026-08-13", t:"qual", title:"Côtes · 8-10 × 45 s", km:10, det:{"Échauffement":[WU],"Corps de séance":["8-10 × 45 s en montée (pente 6-10 %), effort soutenu mais pas sprint.","Récup : redescente en trottinant.","Ta montée est ton point faible : c'est ici que tu gagnes des places sur ce format. Posture haute, appuis dynamiques, regard loin."],"Retour au calme":[CD]}},
+  {d:"2026-08-14", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
+  {d:"2026-08-15", t:"easy", title:"Footing easy 40-45 min + strides", km:8, det:{"Séance":["FC ~145 + 4 strides."]}},
+  {d:"2026-08-16", t:"long", title:"Sortie longue modérée 1h15-1h30", km:15, det:{"Séance":["Trail vallonné mais ROULANT, Z2 à l'effort (FC 150-162 sur plat, plus en montée c'est ok).","Descentes coulées, pas de technique appuyée (Achille/malléole encore en observation).","Boire régulièrement."]}},
+ ]},
+ {id:4, label:"S4 · 17 → 23 août", phase:"Reconstruction", km:65, days:[
+  {d:"2026-08-17", t:"easy", title:"Footing easy 45-50 min", km:9, det:{"Séance":["FC ~145."]}},
+  {d:"2026-08-18", t:"qual", title:"Seuil · 3 × 8 min", km:12, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["3 × 8 min au seuil (FC 180-188, allure calée le 11 août).","Récup 2 min trot.","Variante si jambes moyennes : 4 × 6 min."],"Retour au calme":[CD]}},
+  {d:"2026-08-19", t:"renfo", title:"Footing easy 45 min + renfo prévention", km:9, det:{"Course":["Footing 45 min FC ~145."],"Exercices (salle)":RENFO_PREV,"Note":[RENFO_NOTE]}},
+  {d:"2026-08-20", t:"qual", title:"Côtes puissance · 6 × 1 min 30", km:10, det:{"Échauffement":[WU],"Corps de séance":["6 × 1 min 30 en montée, effort soutenu et puissant — ta zone de progrès (montée) et parfait pour les 500 m D+ du Montberou.","Récup : redescente en trottinant + 30 s marche si besoin."],"Retour au calme":[CD]}},
+  {d:"2026-08-21", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
+  {d:"2026-08-22", t:"easy", title:"Footing court easy 40 min", km:8, det:{"Séance":["FC ~145, tout facile avant la sortie longue."]}},
+  {d:"2026-08-23", t:"long", title:"Sortie longue 1h30 + 20-30 min tempo", km:17, det:{"Séance":["1h30 vallonné.","Au milieu : 20-30 min tempo continu, FC ~168 (entre Z2 et seuil).","Le reste en Z2 tranquille."]}},
+ ]},
+ {id:5, label:"S5 · 24 → 30 août", phase:"Spécifique · pic", km:70, days:[
+  {d:"2026-08-24", t:"easy", title:"Footing easy 45 min", km:9, det:{"Séance":["FC ~145."]}},
+  {d:"2026-08-25", t:"qual", title:"VO2max · 6 × 3 min", km:12, pace:"3:05-3:15", fc:"190-197", det:{"Échauffement":[WU],"Corps de séance":["6 × 3 min à 3:05-3:15/km (FC monte à 190-197 en fin de fraction).","Récup 2 min trot.","Dur mais tenable : la dernière à la même allure que la première."],"Retour au calme":[CD],"Note":["Peu de VMA courte dans ta prépa habituelle — ici on garde ce format long (3 min) car sur 19 km le plafond aérobie compte."]}},
+  {d:"2026-08-26", t:"easy", title:"Footing easy 45 min + strides", km:9, det:{"Séance":["FC ~145 + 4 strides."]}},
+  {d:"2026-08-27", t:"qual", title:"Seuil spécifique · 4 × 8 min allure course", km:13, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["4 × 8 min à allure course Montberou (FC 180-188).","Récup 2 min trot.","Idéalement sur terrain légèrement vallonné, proche du profil course."],"Retour au calme":[CD]}},
+  {d:"2026-08-28", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
+  {d:"2026-08-29", t:"qual", title:"Descentes · progressif + technique", km:11, det:{"Échauffement":[WU],"Corps de séance":["Commence PROGRESSIF : 3-4 descentes roulantes (peu techniques), et n'ajoute du technique que si Achille G et malléole D restent muets.","4-5 répétitions au total (1-3 min), remontée en marchant/trottinant.","Fréquence de pas haute, appuis courts, bras équilibreurs, regard 3-5 m devant."],"Vigilance":["C'est ta force — mais aussi ta zone à risque. Au 1er signal Achille ou malléole, tu ARRÊTES la séance. Chaussures souples/larges (Trabuco Max 2) plutôt que S/Lab sur le dévers."],"Retour au calme":[CD]}},
+  {d:"2026-08-30", t:"long", title:"Sortie longue 1h30 + bloc 20 min allure course", km:16, det:{"Séance":["1h30 vallonné, Z2.","Au milieu : 20 min à allure course (FC 180-188).","Descentes coulées et non techniques (la veille était descente — on ménage)."]}},
+ ]},
+ {id:6, label:"S6 · 31 août → 6 sept", phase:"Spécifique · la plus dure", km:65, days:[
+  {d:"2026-08-31", t:"easy", title:"Footing easy 45 min", km:9, det:{"Séance":["FC ~145."]}},
+  {d:"2026-09-01", t:"qual", title:"Séance épreuve · 3 × 10 min allure course", km:13, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["3 × 10 min à allure course, sur terrain vallonné type course.","Récup 3 min trot.","Répétition générale de l'effort du 20 sept."],"Retour au calme":[CD]}},
+  {d:"2026-09-02", t:"easy", title:"Footing easy 40 min + strides", km:8, det:{"Séance":["FC ~145 + 4 strides."]}},
+  {d:"2026-09-03", t:"qual", title:"Relances · 10 × 1 min", km:10, pace:"2:55-3:05", fc:">195", det:{"Échauffement":[WU],"Corps de séance":["10 × 1 min à 2:55-3:05/km, récup 1 min trot.","À voir comme des relances de course (haut de côte, changements de rythme) plutôt que du 400 sec sur piste."],"Retour au calme":[CD]}},
+  {d:"2026-09-04", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
+  {d:"2026-09-05", t:"qual", title:"Simulation · 40-50 min allure cible", km:12, det:{"Échauffement":[WU],"Corps de séance":["40-50 min continu à allure cible, avec du D+ réparti (à l'effort, FC ~184 sur plat).","Teste TOUT comme le jour J : chaussures, tenue, 1 gel à mi-parcours."],"Retour au calme":[CD]}},
+  {d:"2026-09-06", t:"easy", title:"Footing easy 1h (allégé)", km:11, det:{"Séance":["FC ~145. Footing allégé pour absorber la grosse charge de qualité."]}},
+ ]},
+ {id:7, label:"S7 · 7 → 13 sept", phase:"Affûtage (-30 %)", km:48, days:[
+  {d:"2026-09-07", t:"easy", title:"Footing easy 40 min", km:8, det:{"Séance":["FC ~145."]}},
+  {d:"2026-09-08", t:"qual", title:"Seuil court · 3 × 6 min allure course", km:10, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["3 × 6 min à allure course (FC 180-188), récup 2 min.","On garde le tranchant, on enlève la fatigue."],"Retour au calme":[CD]}},
+  {d:"2026-09-09", t:"renfo", title:"Footing easy 35 min + dernier renfo léger", km:7, det:{"Course":["Footing 35 min FC ~145."],"Exercices (salle)":RENFO_LIGHT,"Note":["Dernier renfo de la prépa — version allégée, on coupe ensuite pour le pic de fraîcheur. On garde juste les fessiers (prévention essuie-glace)."]}},
+  {d:"2026-09-10", t:"qual", title:"Vitesse · 8 × 1 min", km:9, pace:"2:55-3:05", det:{"Échauffement":[WU],"Corps de séance":["8 × 1 min à 2:55-3:05/km, récup 1 min trot."],"Retour au calme":[CD]}},
+  {d:"2026-09-11", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
+  {d:"2026-09-12", t:"easy", title:"Footing court easy 35 min + strides", km:7, det:{"Séance":["FC ~145 + 3-4 strides."]}},
+  {d:"2026-09-13", t:"easy", title:"Footing easy 1h — dernière sortie longue", km:11, det:{"Séance":["FC ~145, tranquille. Dernière sortie un peu longue avant la course."]}},
+ ]},
+ {id:8, label:"S8 · 14 → 20 sept", phase:"Semaine de course", km:40, days:[
+  {d:"2026-09-14", t:"easy", title:"Footing easy 30 min", km:6, det:{"Séance":["FC ~145. Tout est dans la banque, on ne rajoute rien."]}},
+  {d:"2026-09-15", t:"qual", title:"Activation · 25 min + 5-6 × 1 min allure course", km:6, det:{"Séance":["25 min easy avec, dedans, 5-6 × 1 min à allure course, récup 1 min.","Juste réveiller les jambes, zéro fatigue."]}},
+  {d:"2026-09-16", t:"easy", title:"30 min easy + 4 strides", km:6, det:{"Séance":["FC ~145 + 4 strides relâchées."]}},
+  {d:"2026-09-17", t:"off",  title:"Repos", det:{"Consigne":["Repos complet. Prépare sac, dossard, nutrition, chaussures (trail souples pour la malléole)."]}},
+  {d:"2026-09-18", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe. Hydratation, sommeil (fais tes réserves — ton point de vigilance), glucides."]}},
+  {d:"2026-09-19", t:"easy", title:"Déblocage 20 min + 3-4 lignes droites", km:4, det:{"Séance":["20 min très easy + 3-4 lignes droites.","Optionnel — seulement si tu tournes en rond."]}},
+  {d:"2026-09-20", t:"race", title:"LE MONTBEROU — départ 9h00", km:19, det:{"Échauffement":["15-20 min footing + gammes + 3-4 accélérations. Sur 19 km ça part vite : sois déjà chaud sur la ligne."],"Stratégie":["Départ vif MAIS contrôlé : tu as tendance à partir trop vite (« se sentir voler »). Cale-toi dans le bon groupe sans exploser les 2 premiers km.","Effort quasi continu type seuil (~1h15-1h30), FC autour de 184, ajustée au terrain.","Relance en haut de côte — là où les autres soufflent.","Attaque les descentes : c'est ton arme, tu l'as travaillée."],"Nutrition":["Bien hydraté avant. 1 gel vers la mi-course si besoin. Suffisant sur ce format."]}},
+ ]},
+];
+
+const ZONES = [
+ ["Récup / easy","~5:15 – 5:25","142 – 150"],
+ ["Endurance Z2","~5:00 – 5:15","150 – 162"],
+ ["Seuil · allure course *","~3:40 – 3:50","180 – 188"],
+ ["VO2 (≈3 min)","3:05 – 3:15","190 – 197"],
+ ["VO2 court (≈1 min)","2:55 – 3:05","> 195"],
+ ["Strides","rapide, relâché","—"],
+];
+
+const SEED_RACES = [
+ {id:"seed-millet", name:"Millet XTrail Courchevel", date:"2026-07-26", dist:"66 km", dplus:"≈4100 m", notes:"Objectif principal · départ 5h30 · plafond FC 150 les 2 premières heures", seed:true},
+ {id:"seed-tgcm", name:"Le Montberou (TGCM)", date:"2026-09-20", dist:"19 km", dplus:"500 m", notes:"OBJECTIF · podium scratch · départ 9h00 · Montbron", seed:true, target:true},
+ {id:"seed-byu", name:"Backyard Ultra", date:"2026-10-02", dist:"—", dplus:"—", notes:"Expérience · viser 24 h sans se blesser", seed:true},
+];
+
+let mem = {};
+async function sget(k, d){
+  if(window.storage && window.storage.get){
+    try{ const r = await window.storage.get(k); return r ? JSON.parse(r.value) : d; }catch(e){ return d; }
+  }
+  try{ const v = localStorage.getItem(k); return v!==null ? JSON.parse(v) : d; }catch(e){}
+  return (k in mem) ? mem[k] : d;
+}
+async function sset(k, v){
+  mem[k] = v;
+  if(window.storage && window.storage.set){
+    try{ await window.storage.set(k, JSON.stringify(v)); return; }catch(e){}
+  }
+  try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
+}
+
+let done = {};
+let userRaces = [];
+let curWk = 0;
+let sheetDay = null;
+const $ = id => document.getElementById(id);
+const TYPE_LABEL = {off:"Repos", easy:"Endurance", qual:"Qualité", renfo:"Renfo", long:"Sortie longue", race:"Course"};
+function todayISO(){ const n=new Date(); return n.toISOString().slice(0,10); }
+function frDate(iso){ const d=new Date(iso+"T12:00"); return d.toLocaleDateString("fr-FR",{weekday:"short", day:"numeric", month:"short"}); }
+function dow(iso){ return ["DIM","LUN","MAR","MER","JEU","VEN","SAM"][new Date(iso+"T12:00").getDay()]; }
+function dnum(iso){ const d=new Date(iso+"T12:00"); return d.getDate()+"/"+String(d.getMonth()+1).padStart(2,"0"); }
+function daysTo(iso){ return Math.ceil((new Date(iso+"T12:00") - new Date()) / 86400000); }
+
+function drawProfile(){
+  const kms = WEEKS.map(w=>w.km), max = Math.max(...kms);
+  const W=360, H=86, pad=14, bw=(W-pad*2)/WEEKS.length;
+  let pts = kms.map((k,i)=>[pad+bw*i+bw/2, H-12-(k/max)*(H-30)]);
+  let path = "M"+pts.map(p=>p[0]+","+p[1]).join(" L");
+  let area = path+" L"+pts[pts.length-1][0]+","+(H-10)+" L"+pts[0][0]+","+(H-10)+" Z";
+  let svg = '<path d="'+area+'" fill="rgba(255,107,53,.10)"/><path d="'+path+'" fill="none" stroke="#FF6B35" stroke-width="2" stroke-linejoin="round"/>';
+  pts.forEach((p,i)=>{
+    const act = i===curWk;
+    svg += '<g class="wk-dot" data-wk="'+i+'"><circle cx="'+p[0]+'" cy="'+p[1]+'" r="12" fill="transparent"/><circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(act?5:3.5)+'" fill="'+(act?"#FF6B35":"#15251E")+'" stroke="'+(act?"#FF6B35":"#8FA69A")+'" stroke-width="1.5"/><text x="'+p[0]+'" y="'+(H-1)+'" text-anchor="middle" font-size="9" font-family="Barlow Condensed" fill="'+(act?"#FF6B35":"#5C7268")+'">S'+(i+1)+'</text></g>';
+  });
+  $("loadsvg").innerHTML = svg;
+  $("loadsvg").querySelectorAll(".wk-dot").forEach(g=>{ g.addEventListener("click", ()=>{ curWk = +g.dataset.wk; renderWeek(); }); });
+}
+
+function renderWeek(){
+  const w = WEEKS[curWk];
+  $("wktitle").textContent = w.label;
+  const nDone = w.days.filter(d=>done[d.d]).length;
+  const nS = w.days.filter(d=>d.t!=="off").length;
+  $("wkmeta").textContent = w.phase+" · ~"+w.km+" km · "+nDone+"/"+nS+" faites";
+  $("prevwk").disabled = curWk===0;
+  $("nextwk").disabled = curWk===WEEKS.length-1;
+  const tISO = todayISO();
+  $("days").innerHTML = "";
+  w.days.forEach(day=>{
+    const b = document.createElement("button");
+    b.className = "day "+(day.t==="long"?"qual":day.t)+(done[day.d]?" done":"")+(day.d===tISO?" today":"");
+    let chips = '<span class="chip">'+TYPE_LABEL[day.t]+'</span>';
+    if(day.km) chips += '<span class="chip">≈ '+day.km+' km</span>';
+    if(day.fc) chips += '<span class="chip hot">FC '+day.fc+'</span>';
+    if(day.pace) chips += '<span class="chip hot">'+day.pace+'/km</span>';
+    b.innerHTML = '<span class="bar"></span><span class="datecol"><span class="dow">'+dow(day.d)+'</span><span class="dnum">'+dnum(day.d)+'</span></span><span class="main"><span class="stitle">'+day.title+'</span><span class="schips">'+chips+'</span></span><span class="checkcol"><span class="check">✓</span></span>';
+    b.addEventListener("click", ()=>openSheet(day));
+    $("days").appendChild(b);
+  });
+  drawProfile();
+}
+
+function openSheet(day){
+  sheetDay = day;
+  $("sheettag").textContent = frDate(day.d)+" · "+TYPE_LABEL[day.t];
+  $("sheettitle").textContent = day.title;
+  let chips = "";
+  if(day.km) chips += '<span class="chip">≈ '+day.km+' km</span>';
+  if(day.fc) chips += '<span class="chip hot">FC '+day.fc+'</span>';
+  if(day.pace) chips += '<span class="chip hot">'+day.pace+'/km</span>';
+  $("sheetchips").innerHTML = chips;
+  let html = "";
+  for(const [sec, items] of Object.entries(day.det||{})){
+    const warn = (sec==="Vigilance");
+    html += '<div class="sec'+(warn?' warn':'')+'"><h3>'+(warn?'⚠ ':'')+sec+'</h3>';
+    if(items.length>1 || sec.startsWith("Exercices")) html += "<ul>"+items.map(i=>'<li>'+i+'</li>').join("")+"</ul>";
+    else html += items.map(i=>'<p>'+i+'</p>').join("");
+    html += "</div>";
+  }
+  $("sheetbody").innerHTML = html;
+  $("togdone").textContent = done[day.d] ? "Annuler ✓" : "Marquer faite ✓";
+  $("overlay").classList.add("open"); $("sheet").classList.add("open");
+}
+function closeSheet(){ $("overlay").classList.remove("open"); $("sheet").classList.remove("open"); sheetDay=null; }
+$("overlay").addEventListener("click", closeSheet);
+$("closesheet").addEventListener("click", closeSheet);
+$("togdone").addEventListener("click", async ()=>{
+  if(!sheetDay) return;
+  if(done[sheetDay.d]) delete done[sheetDay.d]; else done[sheetDay.d]=true;
+  await sset("tgcm-done", done);
+  toast(done[sheetDay.d] ? "Séance validée 💪" : "Séance décochée");
+  closeSheet(); renderWeek();
+});
+
+function renderRaces(){
+  const all = [...SEED_RACES, ...userRaces].sort((a,b)=>a.date.localeCompare(b.date));
+  $("racelist").innerHTML = all.map(r=>{
+    const dj = daysTo(r.date);
+    const jj = dj>0 ? "J-"+dj : (dj===0 ? "JOUR J" : "passée");
+    return '<div class="race-card'+(r.target?" target":"")+'"><div class="rdate">'+frDate(r.date)+' '+r.date.slice(0,4)+'</div><h3>'+r.name+'</h3><div class="rchips">'+(r.dist&&r.dist!=="—"?'<span class="chip">'+r.dist+'</span>':"")+(r.dplus&&r.dplus!=="—"?'<span class="chip">'+r.dplus+' D+</span>':"")+'</div>'+(r.notes?'<div class="rnotes">'+r.notes+'</div>':"")+'<div class="jj">'+jj+'</div>'+(r.seed?"":'<button class="del" data-id="'+r.id+'">supprimer</button>')+'</div>';
+  }).join("");
+  $("racelist").querySelectorAll(".del").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      userRaces = userRaces.filter(r=>r.id!==btn.dataset.id);
+      await sset("tgcm-races", userRaces);
+      renderRaces(); toast("Course supprimée");
+    });
+  });
+}
+$("raceform").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const name=$("rname").value.trim(), date=$("rdate").value;
+  if(!name || !date) return;
+  userRaces.push({ id:"u"+Date.now(), name, date,
+    dist: $("rdist").value.trim() ? $("rdist").value.trim().replace(/km?$/i,"").trim()+" km" : "",
+    dplus: $("rdplus").value.trim() ? $("rdplus").value.trim().replace(/m$/i,"").trim()+" m" : "",
+    notes: $("rnotes").value.trim() });
+  await sset("tgcm-races", userRaces);
+  e.target.reset(); renderRaces(); toast("Course ajoutée 🏁");
+});
+
+$("zonesbody").innerHTML = ZONES.map(z=>'<tr><td>'+z[0]+'</td><td><b>'+z[1]+'</b></td><td><b>'+z[2]+'</b></td></tr>').join("");
+
+const pages = {plan:$("page-plan"), races:$("page-races"), zones:$("page-zones")};
+["plan","races","zones"].forEach(t=>{
+  $("tab-"+t).addEventListener("click", ()=>{
+    Object.entries(pages).forEach(([k,el])=>el.classList.toggle("hidden", k!==t));
+    ["plan","races","zones"].forEach(k=>$("tab-"+k).classList.toggle("active", k===t));
+    window.scrollTo(0,0);
+  });
+});
+
+let toastT;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1800); }
+
+(async function init(){
+  const dj = daysTo(RACE_DAY);
+  $("jj").textContent = dj>0 ? "J-"+dj : (dj===0 ? "JOUR J" : "Finie !");
+  done = await sget("tgcm-done", {});
+  userRaces = await sget("tgcm-races", []);
+  const t = todayISO();
+  let idx = WEEKS.findIndex(w => t >= w.days[0].d && t <= w.days[6].d);
+  if(idx === -1) idx = t < WEEKS[0].days[0].d ? 0 : WEEKS.length-1;
+  curWk = idx;
+  renderWeek(); renderRaces();
+  $("prevwk").addEventListener("click", ()=>{ if(curWk>0){curWk--; renderWeek();} });
+  $("nextwk").addEventListener("click", ()=>{ if(curWk<WEEKS.length-1){curWk++; renderWeek();} });
+})();
+
+if('serviceWorker' in navigator){ window.addEventListener('load', function(){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }); }
+</script>
+</body>
+</html>
