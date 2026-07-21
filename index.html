@@ -7,10 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Montberou">
+<meta name="apple-mobile-web-app-title" content="Le Suquet">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Montberou · Plan</title>
+<title>Le Suquet · Plan</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -131,8 +131,8 @@ table.zones td b{font-family:var(--disp); font-size:15px; letter-spacing:.02em}
 
 <header>
   <div class="eyebrow">Objectif · podium scratch</div>
-  <h1>Le Montberou</h1>
-  <p class="sub">19 km · 500 m D+ · Montbron · dim. 20 sept, 9h00</p>
+  <h1>Le Suquet de la Grolle</h1>
+  <p class="sub">22 km · 750 m D+ · Eymoutiers (Alefpa Trail) · sam. 19 sept, 9h30</p>
   <div class="countdown"><b id="jj">J-–</b><span>avant la course</span></div>
 </header>
 
@@ -217,11 +217,11 @@ table.zones td b{font-family:var(--disp); font-size:15px; letter-spacing:.02em}
 </nav>
 
 <div class="toast" id="toast"></div>
-<div class="version">Plan v4 · zones FC recalées (FCmax 202) + protocole renfo perso + adaptations blessures · Pour modifier : demande à Claude.</div>
+<div class="version">Plan v5 · course cible : Suquet de la Grolle (22 km/750 m D+, sam. 19 sept) · Pour modifier : demande à Claude.</div>
 
 <script>
 const PLAN_V = 4;
-const RACE_DAY = "2026-09-20";
+const RACE_DAY = "2026-09-19";
 const WU = "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux) + 3 lignes droites progressives.";
 const CD = "Retour au calme 10 min très easy + hydratation.";
 
@@ -277,27 +277,27 @@ const WEEKS = [
   {d:"2026-08-17", t:"easy", title:"Footing easy 45-50 min", km:9, det:{"Séance":["FC ~145."]}},
   {d:"2026-08-18", t:"qual", title:"Seuil · 3 × 8 min", km:12, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["3 × 8 min au seuil (FC 180-188, allure calée le 11 août).","Récup 2 min trot.","Variante si jambes moyennes : 4 × 6 min."],"Retour au calme":[CD]}},
   {d:"2026-08-19", t:"renfo", title:"Footing easy 45 min + renfo prévention", km:9, det:{"Course":["Footing 45 min FC ~145."],"Exercices (salle)":RENFO_PREV,"Note":[RENFO_NOTE]}},
-  {d:"2026-08-20", t:"qual", title:"Côtes puissance · 6 × 1 min 30", km:10, det:{"Échauffement":[WU],"Corps de séance":["6 × 1 min 30 en montée, effort soutenu et puissant — ta zone de progrès (montée) et parfait pour les 500 m D+ du Montberou.","Récup : redescente en trottinant + 30 s marche si besoin."],"Retour au calme":[CD]}},
+  {d:"2026-08-20", t:"qual", title:"Côtes puissance · 6 × 1 min 30", km:10, det:{"Échauffement":[WU],"Corps de séance":["6 × 1 min 30 en montée, effort soutenu et puissant — ta zone de progrès (montée) et exactement ce qu'il faut pour les 750 m D+ du Suquet de la Grolle.","Récup : redescente en trottinant + 30 s marche si besoin."],"Retour au calme":[CD]}},
   {d:"2026-08-21", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
   {d:"2026-08-22", t:"easy", title:"Footing court easy 40 min", km:8, det:{"Séance":["FC ~145, tout facile avant la sortie longue."]}},
   {d:"2026-08-23", t:"long", title:"Sortie longue 1h30 + 20-30 min tempo", km:17, det:{"Séance":["1h30 vallonné.","Au milieu : 20-30 min tempo continu, FC ~168 (entre Z2 et seuil).","Le reste en Z2 tranquille."]}},
  ]},
  {id:5, label:"S5 · 24 → 30 août", phase:"Spécifique · pic", km:70, days:[
   {d:"2026-08-24", t:"easy", title:"Footing easy 45 min", km:9, det:{"Séance":["FC ~145."]}},
-  {d:"2026-08-25", t:"qual", title:"VO2max · 6 × 3 min", km:12, pace:"3:05-3:15", fc:"190-197", det:{"Échauffement":[WU],"Corps de séance":["6 × 3 min à 3:05-3:15/km (FC monte à 190-197 en fin de fraction).","Récup 2 min trot.","Dur mais tenable : la dernière à la même allure que la première."],"Retour au calme":[CD],"Note":["Peu de VMA courte dans ta prépa habituelle — ici on garde ce format long (3 min) car sur 19 km le plafond aérobie compte."]}},
+  {d:"2026-08-25", t:"qual", title:"VO2max · 6 × 3 min", km:12, pace:"3:05-3:15", fc:"190-197", det:{"Échauffement":[WU],"Corps de séance":["6 × 3 min à 3:05-3:15/km (FC monte à 190-197 en fin de fraction).","Récup 2 min trot.","Dur mais tenable : la dernière à la même allure que la première."],"Retour au calme":[CD],"Note":["Peu de VMA courte dans ta prépa habituelle — ici on garde ce format long (3 min) car sur 22 km avec 750 m D+ le plafond aérobie compte autant que la puissance en côte."]}},
   {d:"2026-08-26", t:"easy", title:"Footing easy 45 min + strides", km:9, det:{"Séance":["FC ~145 + 4 strides."]}},
-  {d:"2026-08-27", t:"qual", title:"Seuil spécifique · 4 × 8 min allure course", km:13, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["4 × 8 min à allure course Montberou (FC 180-188).","Récup 2 min trot.","Idéalement sur terrain légèrement vallonné, proche du profil course."],"Retour au calme":[CD]}},
+  {d:"2026-08-27", t:"qual", title:"Seuil spécifique · 4 × 8 min allure course + relances côtes", km:13, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["4 × 8 min à allure course (FC 180-188), avec si possible 1-2 min de côte modérée dans chaque bloc (le Suquet a 750 m D+, du plus bosselé que prévu).","Récup 2 min trot.","Idéalement sur terrain vallonné, proche du profil course."],"Retour au calme":[CD]}},
   {d:"2026-08-28", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
   {d:"2026-08-29", t:"qual", title:"Descentes · progressif + technique", km:11, det:{"Échauffement":[WU],"Corps de séance":["Commence PROGRESSIF : 3-4 descentes roulantes (peu techniques), et n'ajoute du technique que si Achille G et malléole D restent muets.","4-5 répétitions au total (1-3 min), remontée en marchant/trottinant.","Fréquence de pas haute, appuis courts, bras équilibreurs, regard 3-5 m devant."],"Vigilance":["C'est ta force — mais aussi ta zone à risque. Au 1er signal Achille ou malléole, tu ARRÊTES la séance. Chaussures souples/larges (Trabuco Max 2) plutôt que S/Lab sur le dévers."],"Retour au calme":[CD]}},
   {d:"2026-08-30", t:"long", title:"Sortie longue 1h30 + bloc 20 min allure course", km:16, det:{"Séance":["1h30 vallonné, Z2.","Au milieu : 20 min à allure course (FC 180-188).","Descentes coulées et non techniques (la veille était descente — on ménage)."]}},
  ]},
  {id:6, label:"S6 · 31 août → 6 sept", phase:"Spécifique · la plus dure", km:65, days:[
   {d:"2026-08-31", t:"easy", title:"Footing easy 45 min", km:9, det:{"Séance":["FC ~145."]}},
-  {d:"2026-09-01", t:"qual", title:"Séance épreuve · 3 × 10 min allure course", km:13, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["3 × 10 min à allure course, sur terrain vallonné type course.","Récup 3 min trot.","Répétition générale de l'effort du 20 sept."],"Retour au calme":[CD]}},
+  {d:"2026-09-01", t:"qual", title:"Séance épreuve · 3 × 10 min allure course", km:13, fc:"180-188", det:{"Échauffement":[WU],"Corps de séance":["3 × 10 min à allure course, sur terrain vallonné type course.","Récup 3 min trot.","Répétition générale de l'effort du 19 sept."],"Retour au calme":[CD]}},
   {d:"2026-09-02", t:"easy", title:"Footing easy 40 min + strides", km:8, det:{"Séance":["FC ~145 + 4 strides."]}},
   {d:"2026-09-03", t:"qual", title:"Relances · 10 × 1 min", km:10, pace:"2:55-3:05", fc:">195", det:{"Échauffement":[WU],"Corps de séance":["10 × 1 min à 2:55-3:05/km, récup 1 min trot.","À voir comme des relances de course (haut de côte, changements de rythme) plutôt que du 400 sec sur piste."],"Retour au calme":[CD]}},
   {d:"2026-09-04", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe."]}},
-  {d:"2026-09-05", t:"qual", title:"Simulation · 40-50 min allure cible", km:12, det:{"Échauffement":[WU],"Corps de séance":["40-50 min continu à allure cible, avec du D+ réparti (à l'effort, FC ~184 sur plat).","Teste TOUT comme le jour J : chaussures, tenue, 1 gel à mi-parcours."],"Retour au calme":[CD]}},
+  {d:"2026-09-05", t:"qual", title:"Simulation · 40-50 min allure cible", km:12, det:{"Échauffement":[WU],"Corps de séance":["40-50 min continu à allure cible, avec un vrai profil bosselé (750 m D+ sur 22 km = quasi une côte tous les 2-3 km) — à l'effort, FC ~184 sur plat, plus haut en montée.","Teste TOUT comme le jour J : chaussures, tenue, 1 gel à mi-parcours."],"Retour au calme":[CD]}},
   {d:"2026-09-06", t:"easy", title:"Footing easy 1h (allégé)", km:11, det:{"Séance":["FC ~145. Footing allégé pour absorber la grosse charge de qualité."]}},
  ]},
  {id:7, label:"S7 · 7 → 13 sept", phase:"Affûtage (-30 %)", km:48, days:[
@@ -309,14 +309,13 @@ const WEEKS = [
   {d:"2026-09-12", t:"easy", title:"Footing court easy 35 min + strides", km:7, det:{"Séance":["FC ~145 + 3-4 strides."]}},
   {d:"2026-09-13", t:"easy", title:"Footing easy 1h — dernière sortie longue", km:11, det:{"Séance":["FC ~145, tranquille. Dernière sortie un peu longue avant la course."]}},
  ]},
- {id:8, label:"S8 · 14 → 20 sept", phase:"Semaine de course", km:40, days:[
+ {id:8, label:"S8 · 14 → 19 sept", phase:"Semaine de course", km:34, days:[
   {d:"2026-09-14", t:"easy", title:"Footing easy 30 min", km:6, det:{"Séance":["FC ~145. Tout est dans la banque, on ne rajoute rien."]}},
-  {d:"2026-09-15", t:"qual", title:"Activation · 25 min + 5-6 × 1 min allure course", km:6, det:{"Séance":["25 min easy avec, dedans, 5-6 × 1 min à allure course, récup 1 min.","Juste réveiller les jambes, zéro fatigue."]}},
+  {d:"2026-09-15", t:"qual", title:"Activation · 25 min + 4-5 × 1 min allure course + 3 côtes courtes", km:6, det:{"Séance":["25 min easy avec, dedans, 4-5 × 1 min à allure course, récup 1 min.","+ 3 côtes courtes (30 s) en fin de séance pour réactiver les jambes en montée — le Suquet a 750 m D+.","Juste réveiller les jambes, zéro fatigue."]}},
   {d:"2026-09-16", t:"easy", title:"30 min easy + 4 strides", km:6, det:{"Séance":["FC ~145 + 4 strides relâchées."]}},
-  {d:"2026-09-17", t:"off",  title:"Repos", det:{"Consigne":["Repos complet. Prépare sac, dossard, nutrition, chaussures (trail souples pour la malléole)."]}},
-  {d:"2026-09-18", t:"off",  title:"OFF (vendredi)", det:{"Consigne":["Jour off fixe. Hydratation, sommeil (fais tes réserves — ton point de vigilance), glucides."]}},
-  {d:"2026-09-19", t:"easy", title:"Déblocage 20 min + 3-4 lignes droites", km:4, det:{"Séance":["20 min très easy + 3-4 lignes droites.","Optionnel — seulement si tu tournes en rond."]}},
-  {d:"2026-09-20", t:"race", title:"LE MONTBEROU — départ 9h00", km:19, det:{"Échauffement":["15-20 min footing + gammes + 3-4 accélérations. Sur 19 km ça part vite : sois déjà chaud sur la ligne."],"Stratégie":["Départ vif MAIS contrôlé : tu as tendance à partir trop vite (« se sentir voler »). Cale-toi dans le bon groupe sans exploser les 2 premiers km.","Effort quasi continu type seuil (~1h15-1h30), FC autour de 184, ajustée au terrain.","Relance en haut de côte — là où les autres soufflent.","Attaque les descentes : c'est ton arme, tu l'as travaillée."],"Nutrition":["Bien hydraté avant. 1 gel vers la mi-course si besoin. Suffisant sur ce format."]}},
+  {d:"2026-09-17", t:"easy", title:"Déblocage 20 min + 3-4 lignes droites", km:4, det:{"Séance":["20 min très easy + 3-4 lignes droites.","Course avancée au samedi → on garde un tout petit jus dans les jambes plutôt qu'un repos total."]}},
+  {d:"2026-09-18", t:"off",  title:"OFF (vendredi) — veille de course", det:{"Consigne":["Jour off fixe, encore mieux placé : veille de course.","Prépare sac, dossard, nutrition, chaussures (trail souples pour la malléole).","Hydratation, sommeil (fais tes réserves), glucides."]}},
+  {d:"2026-09-19", t:"race", title:"LE SUQUET DE LA GROLLE — départ 9h30", km:22, det:{"Échauffement":["15-20 min footing + gammes + 3-4 accélérations. Sois déjà chaud sur la ligne."],"Stratégie":["Départ vif MAIS contrôlé : tu as tendance à partir trop vite (« se sentir voler »). Cale-toi dans le bon groupe sans exploser les 2 premiers km.","750 m de D+ sur 22 km = un profil plus bosselé. Gère l'effort en côte à la FC/sensations, pas au chrono — c'est justement ta zone de progrès du bloc.","Effort soutenu global (~1h30-1h50 selon profil), FC autour de 180-185 en moyenne, plus haut dans les montées.","Relance en haut de côte — là où les autres soufflent, c'est ton levier n°1 sur ce parcours.","Attaque les descentes : ton arme, tu l'as travaillée — mais reste à l'écoute d'Achille/malléole."],"Nutrition":["Bien hydraté avant. 1 gel vers la mi-course. Suffisant sur ce format."]}},
  ]},
 ];
 
@@ -331,7 +330,7 @@ const ZONES = [
 
 const SEED_RACES = [
  {id:"seed-millet", name:"Millet XTrail Courchevel", date:"2026-07-26", dist:"66 km", dplus:"≈4100 m", notes:"Objectif principal · départ 5h30 · plafond FC 150 les 2 premières heures", seed:true},
- {id:"seed-tgcm", name:"Le Montberou (TGCM)", date:"2026-09-20", dist:"19 km", dplus:"500 m", notes:"OBJECTIF · podium scratch · départ 9h00 · Montbron", seed:true, target:true},
+ {id:"seed-suquet", name:"Trail du Suquet de la Grolle", date:"2026-09-19", dist:"22 km", dplus:"750 m", notes:"OBJECTIF · podium scratch · départ 9h30 · Eymoutiers (Alefpa Trail)", seed:true, target:true},
  {id:"seed-byu", name:"Backyard Ultra", date:"2026-10-02", dist:"—", dplus:"—", notes:"Expérience · viser 24 h sans se blesser", seed:true},
 ];
 
