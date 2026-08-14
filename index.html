@@ -66,6 +66,10 @@ h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size
 .check{width:26px; height:26px; border-radius:50%; border:2px solid var(--dim); display:flex; align-items:center; justify-content:center; font-size:14px; color:transparent; flex:none}
 .day.done{opacity:.55}
 .day.done .check{border-color:var(--moss); background:var(--moss-soft); color:var(--moss)}
+/* Etat NON ENREGISTRE : l'interface ne doit jamais laisser croire qu'une coche
+   ou un ressenti est sauvegarde alors que l'ecriture a echoue. */
+.day.unsaved{border-color:rgba(224,168,62,.55); opacity:1}
+.day.unsaved .check{border-color:var(--amber); background:rgba(224,168,62,.14); color:var(--amber)}
 .day.today{border-color:rgba(255,107,53,.5)}
 .day.today .dow{color:var(--orange)}
 .day.race{background:linear-gradient(100deg, rgba(255,107,53,.16), var(--panel) 60%)}
@@ -78,7 +82,7 @@ h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size
 .sheet .grab{width:42px; height:4px; border-radius:2px; background:var(--dim); margin:10px auto 0}
 .sheet .shead{padding:10px 18px 8px; border-bottom:1px solid var(--line)}
 .sheet .stag{font-family:var(--disp); font-weight:600; text-transform:uppercase; letter-spacing:.12em; font-size:11.5px; color:var(--orange)}
-.sheet h2{font-family:var(--disp); font-weight:700; text-transform:uppercase; margin:2px 0 6px; font-size:24px; line-height:1.05}
+.sheet h2{font-family:var(--disp); font-weight:700; text-transform:uppercase; margin:2px 0 6px; font-size:24px; line-height:1.05; word-break:break-word; overflow-wrap:anywhere}
 .sheet .schips{display:flex; gap:6px; flex-wrap:wrap; padding-bottom:4px}
 .sheet .sbody{padding:12px 18px calc(18px + env(safe-area-inset-bottom)); overflow-y:auto}
 .sec{margin-bottom:14px}
@@ -122,9 +126,18 @@ table.zones td b{font-family:var(--disp); font-size:15px; letter-spacing:.02em}
 .card li{font-size:13.5px; line-height:1.5; margin-bottom:5px}
 .note{font-size:12.5px; color:var(--muted); line-height:1.45; margin-top:12px}
 .version{font-size:11px; color:var(--dim); text-align:center; padding:16px 0 4px}
-.toast{position:fixed; bottom:calc(78px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line); color:var(--ink); border-radius:999px; padding:8px 16px; font-size:13.5px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:60; white-space:nowrap}
+.toast{position:fixed; bottom:calc(78px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line); color:var(--ink); border-radius:18px; padding:8px 16px; font-size:13.5px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:60; max-width:calc(100vw - 32px); white-space:normal; text-align:center; line-height:1.35}
 .toast.show{opacity:1}
 .hidden{display:none}
+/* Bandeau d'alerte PERSISTANT : perte de donnees silencieuse = signal qui reste
+   affiche tant que le probleme dure (un toast de 1,8 s peut etre manque). */
+.savealert{position:sticky; top:0; z-index:35; background:rgba(224,168,62,.16); border-bottom:1px solid rgba(224,168,62,.45); padding:calc(9px + env(safe-area-inset-top)) 14px 11px; backdrop-filter:blur(8px)}
+.savealert b{display:block; font-family:var(--disp); font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:14px; color:var(--amber); margin-bottom:4px}
+.savealert p{margin:0; font-size:12.5px; line-height:1.45; color:var(--ink)}
+.savealert button{margin-top:9px; width:100%; padding:10px; border-radius:10px; background:rgba(224,168,62,.18); border:1px solid rgba(224,168,62,.55); color:var(--amber); font-weight:600; font-size:14px; font-family:var(--body)}
+/* Bandeau affiche : c'est lui qui porte la marge d'encoche, pas le header
+   (sinon env(safe-area-inset-top) serait compte deux fois). */
+body.hasalert header{padding-top:14px}
 /* today card + progress */
 .progress{margin:8px 0 2px; height:6px; border-radius:3px; background:var(--panel); overflow:hidden}
 .progress > i{display:block; height:100%; width:0; background:linear-gradient(90deg,var(--moss),var(--orange)); border-radius:3px; transition:width .4s}
@@ -162,15 +175,35 @@ table.zones td b{font-family:var(--disp); font-size:15px; letter-spacing:.02em}
 .jentry .je-pains{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
 .pchip{font-size:11px; padding:2px 8px; border-radius:6px; background:rgba(224,168,62,.14); color:var(--amber)}
 .empty{color:var(--dim); font-size:13.5px; text-align:center; padding:24px 10px; line-height:1.6}
-textarea.io{width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px; color:var(--ink); font-size:12px; font-family:monospace; min-height:70px; margin-top:8px}
+/* font-size 16px obligatoire : en dessous, iOS zoome automatiquement au focus sans dezoomer */
+textarea.io{width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px; color:var(--ink); font-size:16px; font-family:monospace; min-height:70px; margin-top:8px}
+/* mise a jour du plan */
+input[type=file].io{display:block; width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:9px 10px; color:var(--muted); font-size:16px; font-family:var(--body); margin-top:8px}
+.plan-msg{white-space:pre-wrap; word-break:break-word}
+.plan-msg.err{color:var(--amber)}
+.plan-msg.ok{color:var(--moss)}
 </style>
 </head>
 <body>
 
+<div class="savealert hidden" id="savealert" role="alert" aria-live="assertive">
+  <div id="savealert-write">
+    <b>⚠ Non enregistré — stockage plein</b>
+    <p>Tes dernières modifications sont affichées mais <b>ne sont pas sauvegardées</b> : elles seront perdues à la fermeture de l'app.<br>
+    Libère de l'espace sur ton iPhone, et vérifie que tu n'es pas en navigation privée. En attendant, <b>exporte tes données</b> pour ne rien perdre.</p>
+  </div>
+  <div id="savealert-read" class="hidden">
+    <b>⚠ Historique illisible — n'entre rien</b>
+    <p>L'app n'a pas réussi à lire <b id="savealert-what">tes données</b> sur cet appareil. Pour ne rien écraser, <b>toute saisie concernée est refusée</b> — et <b>ne te fie pas à ce qui est affiché ici</b>, ce n'est pas ton historique réel.<br>
+    Ferme complètement l'app et rouvre-la. Si ça persiste : vérifie que tu n'es pas en navigation privée, libère de l'espace, puis restaure ta dernière sauvegarde depuis l'onglet Journal. Le plan reste consultable.</p>
+  </div>
+  <button type="button" id="savealert-export">Exporter mes données maintenant</button>
+</div>
+
 <header>
-  <div class="eyebrow">Objectif · perf + index UTMB</div>
-  <h1>L'Adonis Trail</h1>
-  <p class="sub">26 km · 1121 m D+ · Roquefort-sur-Soulzon · dim. 6 déc · dossard pris ✓</p>
+  <div class="eyebrow" id="hdr-eyebrow">Objectif · perf + index UTMB</div>
+  <h1 id="hdr-title">L'Adonis Trail</h1>
+  <p class="sub" id="hdr-sub">26 km · 1121 m D+ · Roquefort-sur-Soulzon · dim. 6 déc · dossard pris ✓</p>
   <div class="countdown"><b id="jj">J-–</b><span>avant la course</span></div>
   <div class="progress" aria-hidden="true"><i id="progbar"></i></div>
   <div class="progress-lbl" id="proglbl"></div>
@@ -266,6 +299,20 @@ textarea.io{width:100%; background:var(--bg); border:1px solid var(--line); bord
   <p class="note"><b>À vérifier :</b> pointe à 215 bpm relevée le 12 août, au-dessus de ta FCmax connue (202). C'est probablement un artefact de ceinture, mais si ça se reproduit, garde-le en tête pour ton prochain contrôle médical.</p>
   <p class="note">VMA 19 km/h (oct. 2025) · FCmax 202 · FC repos 43 · 66 kg · 10 km 35'17 · moteur aérobie fort, fort sur plat et en descente, point faible = montée.</p>
   <p class="note"><b>Suivi sommeil :</b> renseigne « Sommeil (h) » et « FC repos matin » dans le ressenti de chaque séance, puis <b>Exporter</b> depuis l'onglet Journal et envoie le fichier à Claude. La FC de repos qui grimpe de 5-7 bpm plusieurs jours d'affilée = signal de surcharge avant même que les jambes parlent.</p>
+
+  <div class="card">
+    <h3>🔄 Mettre à jour le plan</h3>
+    <p class="note" id="planinfo" style="margin-top:0">Plan en cours de chargement…</p>
+    <textarea class="io" id="planbox" placeholder="Colle ici le JSON du plan envoyé par Claude, puis tape Valider." spellcheck="false"></textarea>
+    <input class="io" type="file" id="planfile" accept=".json,application/json" aria-label="Importer un fichier de plan JSON">
+    <div class="frow" style="margin-top:8px"><button class="btn ghost" id="planvalidate" type="button">Valider</button><button class="btn ghost" id="planreset" type="button">Plan par défaut</button></div>
+    <div class="note plan-msg hidden" id="planmsg"></div>
+    <div class="hidden" id="planconfirm">
+      <p class="note plan-msg" id="plansummary" style="color:var(--moss)"></p>
+      <div class="frow"><button class="btn ghost" id="plancancel" type="button">Annuler</button><button class="btn primary" id="planapply" type="button">Appliquer</button></div>
+    </div>
+    <p class="note">Tes coches, ton journal et tes courses ne sont jamais touchés par un changement de plan (ils sont indexés par date).</p>
+  </div>
 </section>
 
 <section id="page-journal" class="pagepad hidden">
@@ -301,11 +348,20 @@ textarea.io{width:100%; background:var(--bg); border:1px solid var(--line); bord
 </nav>
 
 <div class="toast" id="toast"></div>
-<div class="version">Plan v7 · bloc Adonis 17 semaines (11 août → 6 déc) · muscu intégrée, suivi sommeil &amp; FC repos · Pour modifier : demande à Claude.</div>
+<div class="version" id="versionline">Chargement du plan…</div>
 
 <script>
-const PLAN_V = 4;
-const RACE_DAY = "2026-12-06";
+let RACE_DAY = "";
+
+/* ------------------------------------------------------------------------
+   RÉFÉRENCE UNIQUEMENT — NE PILOTE PLUS L'AFFICHAGE.
+   Depuis la sortie du plan dans plan.json, ces textes (échauffement, retour
+   au calme, protocoles de renfo/prévention) sont recopiés INLINE dans les
+   sections `det` de plan.json. La SOURCE DE VÉRITÉ EST plan.json.
+   Les éditer ici ne change RIEN dans l'app : pour modifier une séance ou un
+   protocole, il faut modifier plan.json (ou importer un plan depuis
+   l'onglet Zones). Conservés sur décision d'Enzo, à titre de référence.
+   ------------------------------------------------------------------------ */
 const WU = "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux) + 3 lignes droites progressives.";
 const CD = "Retour au calme 10 min très easy + hydratation.";
 
@@ -329,2189 +385,156 @@ const RENFO_LIGHT = [
 ];
 const RENFO_NOTE = "Renfo = ton pilier anti-essuie-glace (fessiers, TFL, stabilisateurs), à garder même sans douleur. Tout en contrôle, ZÉRO explosif. Mollets excentriques uniquement selon l'avis de ton kiné. 2ᵉ créneau possible le mardi après la séance (version gainage + haut du corps) si tu veux tenir tes 2 séances/sem.";
 
-const WEEKS = [
- {
-  "id": 1,
-  "label": "S1 · 10 → 16 août",
-  "phase": "Reprise post-maladie (recalée)",
-  "km": 38,
-  "days": [
-   {
-    "d": "2026-08-10",
-    "t": "easy",
-    "title": "Footing easy 7 km ✓",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Fait : 6,97 km à 5:35/km, FC moy 153 (138 → 160 en fin).",
-      "Analyse : à 5:35/km tu es à ~150 bpm, alors que ta référence d'avant maladie est 5:15-5:20 à 145. Environ 20 s/km plus lent pour 5 bpm de plus : reliquat normal de la maladie, rien d'inquiétant."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-11",
-    "t": "off",
-    "title": "Repos (séance décalée au mercredi)",
-    "det": {
-     "Consigne": [
-      "Séance de qualité repoussée d'un jour — aucun souci, le plan s'ajuste."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-12",
-    "t": "qual",
-    "title": "Réveil qualité ✓ FAIT (trop fort)",
-    "km": 8,
-    "fc": "181-189 réel",
-    "det": {
-     "Ce qui était prévu": [
-      "6 × 2 min à FC 165-170 (tempo), récup 1 min 30."
-     ],
-     "Ce que tu as fait": [
-      "4 km d'échauffement (bien), puis 5 répétitions :",
-      "1) 3:48/km — FC 181",
-      "2) 3:46/km — FC 183",
-      "3) 4:13/km en côte (2,5 %) — FC 189, pointe à 215",
-      "4) 4:16/km en côte (2,1 %) — FC 187",
-      "5) 3:57/km — FC ~171-193",
-      "Une pause d'environ 13 min entre la 5ᵉ et le retour au calme."
-     ],
-     "Analyse": [
-      "Tu as tourné 15 à 20 bpm au-dessus de la cible : c'était une séance de SEUIL, voire de VO2 sur la 3ᵉ, pas un réveil en tempo.",
-      "C'est exactement ton pattern connu (Grande Champagne : parti à 162 bpm, 2ᵉ moitié 38 % plus lente). Le boulot du bloc, c'est de savoir courir DOUCEMENT quand c'est écrit doucement.",
-      "Ma part de responsabilité : des reps de 2 min sont trop courtes pour stabiliser la FC — la consigne aurait dû être une allure, pas une FC. C'est corrigé pour la suite."
-     ],
-     "À retenir": [
-      "Donnée utile quand même : 3:47/km sur le plat te met à 181 bpm. On confirme tout au test du 18."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-13",
-    "t": "renfo",
-    "title": "Footing easy 6 km + réathlétisation (salle)",
-    "km": 6,
-    "det": {
-     "Course": [
-      "6 km très easy, FC ≤ 148. Si la FC grimpe toute seule, tu ralentis encore."
-     ],
-     "Exercices (salle)": [
-      "Mobilité chevilles / hanches 5 min",
-      "Isométrie mollet 5 × 45 s (2 jambes → 1 jambe si indolore) — protocole tendon Achille",
-      "Isométrie quadriceps type chaise 4 × 45 s",
-      "Hip thrust 3 × 12 (léger)",
-      "Pont fessier unilatéral 3 × 12 / jambe",
-      "Step-down lent 2 × 8 / jambe (contrôle bassin — prévention essuie-glace)",
-      "Gainage : planche 3 × 45 s + latérale 2 × 30 s / côté"
-     ],
-     "Note": [
-      "ZÉRO explosif. Charges modérées, mouvements lents."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-14",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-15",
-    "t": "easy",
-    "title": "Footing easy 6 km + lignes droites",
-    "km": 6,
-    "det": {
-     "Séance": [
-      "6 km easy, FC ~145-150.",
-      "Fin : 4 lignes droites de 15-20 s, rapides et relâchées."
-     ],
-     "Note": [
-      "Les côtes prévues jeudi sont ANNULÉES cette semaine : ton quota d'intensité est déjà largement rempli par la séance de mercredi. Elles reviennent en S2."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-16",
-    "t": "long",
-    "title": "Sortie longue 1h10 easy",
-    "km": 11,
-    "det": {
-     "Séance": [
-      "1h10 sur trail roulant, FC ≤ 155, à l'effort.",
-      "Objectif : réhabituer les jambes au temps de course. ZÉRO intensité — c'est un test de discipline autant qu'une séance.",
-      "Pas de descente technique cette semaine."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 2,
-  "label": "S2 · 17 → 23 août",
-  "phase": "Reprise + calibration",
-  "km": 47,
-  "days": [
-   {
-    "d": "2026-08-17",
-    "t": "renfo",
-    "title": "Footing easy 6 km + prévention (salle)",
-    "km": 6,
-    "det": {
-     "Course": [
-      "Footing 8 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-18",
-    "t": "qual",
-    "title": "TEST SEUIL · 20 min continu — calibration",
-    "km": 10,
-    "fc": "à mesurer",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "20 min EN CONTINU à ton allure seuil ressentie : effort « confortablement dur », tu peux dire une phrase courte, pas plus.",
-      "Terrain PLAT et régulier (route ou piste), pas de trail — on veut une mesure propre.",
-      "Ne pars pas trop vite : les 5 premières minutes doivent sembler faciles."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ],
-     "IMPORTANT": [
-      "Note ton allure moyenne + ta FC moyenne sur les 20 min, et envoie-les à Claude.",
-      "C'est cette séance qui recalibre TOUTES tes zones pour les 15 semaines suivantes. Ton test VMA date d'octobre 2025 et tu sors de maladie : les zones actuelles sont provisoires."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-19",
-    "t": "renfo",
-    "title": "Footing easy 5 km + Réathlétisation (salle)",
-    "km": 5,
-    "det": {
-     "Course": [
-      "Footing 9 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité chevilles / hanches 5 min",
-      "Isométrie mollet 5 × 45 s (2 jambes → 1 jambe si indolore) — protocole tendon Achille",
-      "Isométrie quadriceps type chaise 4 × 45 s",
-      "Hip thrust 3 × 12 (léger)",
-      "Pont fessier unilatéral 3 × 12 / jambe",
-      "Step-down lent 2 × 8 / jambe (contrôle bassin — prévention essuie-glace)",
-      "Gainage : planche 3 × 45 s + latérale 2 × 30 s / côté"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-20",
-    "t": "qual",
-    "title": "Côtes · 8 × 45 s",
-    "km": 9,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "8 × 45 s en montée, effort soutenu, récup descente en trottinant.",
-      "Ta montée est ton point faible identifié : chaque séance de côtes de ce bloc est un investissement direct sur l'Adonis."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-21",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-22",
-    "t": "easy",
-    "title": "Footing easy 6 km + lignes droites",
-    "km": 6,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-23",
-    "t": "long",
-    "title": "Sortie longue 1h20 · 300 m D+",
-    "km": 11,
-    "dplus": "300 m",
-    "det": {
-     "Séance": [
-      "1h20 vallonné, Z2 à l'effort (FC 150-162 sur plat, plus haut en montée c'est normal).",
-      "Montées : tu cours si ça passe, tu marches vite si ça casse le rythme. Les deux sont valides.",
-      "Descentes coulées, fluides, non techniques."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 3,
-  "label": "S3 · 24 → 30 août",
-  "phase": "Base + force",
-  "km": 56,
-  "days": [
-   {
-    "d": "2026-08-24",
-    "t": "renfo",
-    "title": "Footing easy 8 km + prévention (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 9 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-25",
-    "t": "qual",
-    "title": "Seuil · 2 × 10 min",
-    "km": 11,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "2 × 10 min au seuil (FC 176-184, allure calée au test du 18 août), récup 3 min trot.",
-      "Terrain plat ou faux-plat régulier."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-26",
-    "t": "renfo",
-    "title": "Footing easy 7 km + Force (salle)",
-    "km": 7,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat (barre ou gobelet) 4 × 6 — tempo 3 s descente / 1 s pause / remontée contrôlée, LOURD mais propre",
-      "Soulevé de terre roumain 4 × 6",
-      "Split squat bulgare 3 × 8 / jambe",
-      "Mollets debout 4 × 8 en heavy slow resistance (3 s montée / 3 s descente) — construit le tendon d'Achille",
-      "Mollets assis (genou fléchi) 3 × 10 — cible le soléaire, très sollicité en montée",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage anti-rotation (pallof press) 3 × 10 / côté"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-27",
-    "t": "qual",
-    "title": "Côtes · 8 × 1 min",
-    "km": 10,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "8 × 1 min en montée soutenue, récup descente trottinée.",
-      "Cherche la régularité : la 8e doit ressembler à la 1re."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-28",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-29",
-    "t": "easy",
-    "title": "Footing easy 7 km + lignes droites",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-08-30",
-    "t": "long",
-    "title": "Sortie longue 1h30 · 400 m D+",
-    "km": 13,
-    "dplus": "400 m",
-    "det": {
-     "Séance": [
-      "1h30 vallonné, Z2.",
-      "Première exposition descente : 2-3 descentes coulées à rythme soutenu mais terrain simple.",
-      "But : amorcer l'adaptation musculaire à la descente très progressivement (effet de répétition)."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 4,
-  "label": "S4 · 31 août → 6 sept",
-  "phase": "Base + force",
-  "km": 63,
-  "days": [
-   {
-    "d": "2026-08-31",
-    "t": "renfo",
-    "title": "Footing easy 8 km + prévention (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 9 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-01",
-    "t": "qual",
-    "title": "VO2max · 6 × 3 min",
-    "km": 12,
-    "fc": "188-196",
-    "pace": "3:10-3:20",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "6 × 3 min à 3:10-3:20/km, récup 2 min trot.",
-      "Dur mais tenable : la dernière à la même allure que la première. Si tu ne tiens plus l'allure, tu arrêtes la séance."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-02",
-    "t": "renfo",
-    "title": "Footing easy 8 km + Force (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat (barre ou gobelet) 4 × 6 — tempo 3 s descente / 1 s pause / remontée contrôlée, LOURD mais propre",
-      "Soulevé de terre roumain 4 × 6",
-      "Split squat bulgare 3 × 8 / jambe",
-      "Mollets debout 4 × 8 en heavy slow resistance (3 s montée / 3 s descente) — construit le tendon d'Achille",
-      "Mollets assis (genou fléchi) 3 × 10 — cible le soléaire, très sollicité en montée",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage anti-rotation (pallof press) 3 × 10 / côté"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-03",
-    "t": "qual",
-    "title": "Côtes longues · 6 × 2 min",
-    "km": 10,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "6 × 2 min en montée à effort seuil/au-dessus, récup descente + 30 s marche si besoin.",
-      "On allonge : c'est le format qui ressemble le plus aux bosses de l'Adonis."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-04",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-05",
-    "t": "easy",
-    "title": "Footing easy 8 km + lignes droites",
-    "km": 8,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-06",
-    "t": "long",
-    "title": "Sortie longue 1h45 · 500 m D+",
-    "km": 17,
-    "dplus": "500 m",
-    "det": {
-     "Séance": [
-      "1h45 vallonné, Z2.",
-      "3-4 descentes soutenues sur terrain simple à modérément irrégulier.",
-      "Commence à boire/manger comme en course (1 flasque, 1 gel) — on entraîne aussi l'estomac."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 5,
-  "label": "S5 · 7 → 13 sept",
-  "phase": "Base + force (pic bloc 1)",
-  "km": 69,
-  "days": [
-   {
-    "d": "2026-09-07",
-    "t": "renfo",
-    "title": "Footing easy 9 km + prévention (salle)",
-    "km": 9,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-08",
-    "t": "qual",
-    "title": "Seuil · 3 × 10 min",
-    "km": 12,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "3 × 10 min au seuil, récup 2 min 30 trot.",
-      "30 min de seuil au total : la séance clé de ce premier bloc."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-09",
-    "t": "renfo",
-    "title": "Footing easy 8 km + Force (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat (barre ou gobelet) 4 × 6 — tempo 3 s descente / 1 s pause / remontée contrôlée, LOURD mais propre",
-      "Soulevé de terre roumain 4 × 6",
-      "Split squat bulgare 3 × 8 / jambe",
-      "Mollets debout 4 × 8 en heavy slow resistance (3 s montée / 3 s descente) — construit le tendon d'Achille",
-      "Mollets assis (genou fléchi) 3 × 10 — cible le soléaire, très sollicité en montée",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage anti-rotation (pallof press) 3 × 10 / côté"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-10",
-    "t": "qual",
-    "title": "Côtes · 10 × 1 min",
-    "km": 11,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "10 × 1 min en montée soutenue, récup descente trottinée.",
-      "Volume de côtes le plus élevé du bloc 1."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-11",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-12",
-    "t": "easy",
-    "title": "Footing easy 8 km + lignes droites",
-    "km": 8,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-13",
-    "t": "long",
-    "title": "Sortie longue 2h · 600 m D+ + 20 min allure course",
-    "km": 21,
-    "dplus": "600 m",
-    "det": {
-     "Séance": [
-      "2h vallonné.",
-      "Au milieu : 20 min à allure course Adonis (effort seuil bas, FC ~172-178), en incluant du D+.",
-      "Reste en Z2 avant et après."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 6,
-  "label": "S6 · 14 → 20 sept",
-  "phase": "Course · Rives de l'Indre",
-  "km": 51,
-  "days": [
-   {
-    "d": "2026-09-14",
-    "t": "renfo",
-    "title": "Footing easy 8 km + prévention (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 8 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-15",
-    "t": "qual",
-    "title": "Activation · 5 × 3 min allure course",
-    "km": 11,
-    "fc": "176-182",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "5 × 3 min à allure 13 km (un peu plus rapide que ton seuil), récup 2 min.",
-      "Séance d'affûtage : on entretient le rythme, on ne creuse pas la fatigue."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-16",
-    "t": "easy",
-    "title": "Footing easy 8 km",
-    "km": 8,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Pas de muscu lourde cette semaine — juste du gainage léger si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-17",
-    "t": "easy",
-    "title": "Footing easy 7 km + lignes droites",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-18",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe, à 2 jours de la course. Sommeil et glucides."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-19",
-    "t": "easy",
-    "title": "Déblocage 20 min + 3 lignes droites",
-    "km": 4,
-    "det": {
-     "Séance": [
-      "20 min très easy + 3 lignes droites de 20 s.",
-      "Prépare dossard, tenue, chaussures route/trail roulant."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-20",
-    "t": "race",
-    "title": "COURSE · Trail des Rives de l'Indre — 13 km",
-    "km": 13,
-    "dplus": "150 m",
-    "det": {
-     "Objectif": [
-      "Tu remets ton titre en jeu : tu l'as gagné l'an dernier. Tu y vas pour gagner."
-     ],
-     "Échauffement": [
-      "20 min footing + gammes + 4 accélérations. Sur 13 km ça part vite, il faut être chaud sur la ligne."
-     ],
-     "Stratégie": [
-      "Parcours très roulant (150 m D+) : c'est un effort de type seuil/tempo soutenu, ~45-50 min.",
-      "Ton piège connu : partir trop vite en te « sentant voler ». Les 2 premiers km, tu te contiens et tu observes.",
-      "Sur du plat, ta vitesse route (10 km en 35') est ton arme absolue : place ton accélération à mi-course et durcis progressivement.",
-      "Zéro risque Achille/malléole sur ce profil roulant — tu peux lâcher les chevaux."
-     ],
-     "Note": [
-      "Cette course sert aussi de repère de forme pour caler la suite du bloc. Envoie-moi le résultat."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 7,
-  "label": "S7 · 21 → 27 sept",
-  "phase": "Reprise volume",
-  "km": 72,
-  "days": [
-   {
-    "d": "2026-09-21",
-    "t": "easy",
-    "title": "Footing easy 7 km",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Récupération post-course : vraiment très easy, FC < 145."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-22",
-    "t": "qual",
-    "title": "VO2 · 5 × 4 min",
-    "km": 13,
-    "fc": "188-196",
-    "pace": "3:15-3:25",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "5 × 4 min à 3:15-3:25/km, récup 2 min 30.",
-      "Format long de VO2 : développe le plafond aérobie qui te servira dans les bosses."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-23",
-    "t": "renfo",
-    "title": "Footing easy 10 km + Force (salle)",
-    "km": 10,
-    "det": {
-     "Course": [
-      "Footing 11 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat (barre ou gobelet) 4 × 6 — tempo 3 s descente / 1 s pause / remontée contrôlée, LOURD mais propre",
-      "Soulevé de terre roumain 4 × 6",
-      "Split squat bulgare 3 × 8 / jambe",
-      "Mollets debout 4 × 8 en heavy slow resistance (3 s montée / 3 s descente) — construit le tendon d'Achille",
-      "Mollets assis (genou fléchi) 3 × 10 — cible le soléaire, très sollicité en montée",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage anti-rotation (pallof press) 3 × 10 / côté"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-24",
-    "t": "qual",
-    "title": "Côtes seuil · 5 × 3 min",
-    "km": 12,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "5 × 3 min en montée à effort seuil (pas au-dessus), récup descente.",
-      "Objectif : apprendre à monter LONGTEMPS à un rythme soutenable — exactement les 3 bosses de l'Adonis."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-25",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-26",
-    "t": "qual",
-    "title": "Descentes · 5 × 2 min (1re séance dédiée)",
-    "km": 11,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "5 × 2 min de descente soutenue sur terrain roulant à modérément irrégulier. Remontée en marchant.",
-      "Technique : cadence haute, appuis courts sous le centre de gravité, buste légèrement en avant, bras écartés en balancier, regard 4-5 m devant.",
-      "On commence MODÉRÉ : le but est de lancer l'adaptation musculaire, pas de se détruire les quadriceps."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-27",
-    "t": "long",
-    "title": "Sortie longue 2h15 · 700 m D+",
-    "km": 19,
-    "dplus": "700 m",
-    "det": {
-     "Séance": [
-      "2h15 vallonné, Z2, allure de gestion.",
-      "Jambes probablement un peu marquées par la veille : c'est voulu (résistance à la fatigue)."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 8,
-  "label": "S8 · 28 sept → 4 oct",
-  "phase": "Backyard Ultra",
-  "km": 92,
-  "days": [
-   {
-    "d": "2026-09-28",
-    "t": "renfo",
-    "title": "Footing easy 8 km + prévention (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 8 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-29",
-    "t": "qual",
-    "title": "Seuil · 3 × 8 min (allégé)",
-    "km": 12,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "3 × 8 min au seuil, récup 2 min.",
-      "Dernier vrai stimulus avant la backyard — on entretient sans creuser."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-09-30",
-    "t": "easy",
-    "title": "Footing easy 7 km",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Pas de muscu lourde : on arrive frais sur la backyard."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-01",
-    "t": "easy",
-    "title": "Footing easy 5 km + lignes droites",
-    "km": 5,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-02",
-    "t": "race",
-    "title": "BACKYARD ULTRA — départ",
-    "det": {
-     "Objectif": [
-      "Objectif « expérience » : finir sans se blesser, PAS de record.",
-      "⚠️ Décision importante : je te recommande de te fixer un plafond de tours AVANT le départ (voir Note)."
-     ],
-     "Stratégie": [
-      "Chaque tour à allure très facile (FC < 145), marche dans les côtes dès le début.",
-      "Mange et bois à CHAQUE tour, dès le premier — la backyard se perd par l'estomac.",
-      "Chaussures souples (Trabuco Max 2) : boucle répétée = appuis répétitifs identiques, terrain à risque pour la malléole droite.",
-      "Change de chaussettes/chaussures dès qu'un point chaud apparaît."
-     ],
-     "Note": [
-      "Une backyard poussée à 24 h (~160 km) demande 2-3 semaines de récupération pleine, et elle tombe 9 semaines avant l'Adonis — pour lequel tu as déjà le dossard.",
-      "Mon avis de coach : plafonne à 8-12 tours (~55-80 km, 8-12 h). Tu vis l'expérience, tu prends du temps de course en fatigue (utile pour l'Adonis), et tu es récupéré en une semaine au lieu de trois.",
-      "Si tu vises vraiment 24 h, dis-le-moi : je réécris les semaines 9 à 11 en conséquence, et on accepte que l'Adonis en pâtisse un peu.",
-      "Le ≈ 60 km affiché est une ESTIMATION (8-12 tours) servant à situer la charge de la semaine. Le réel dépendra du nombre de tours que tu fais."
-     ]
-    },
-    "km": 60
-   },
-   {
-    "d": "2026-10-03",
-    "t": "off",
-    "title": "Backyard (suite) / récupération",
-    "det": {
-     "Consigne": [
-      "Selon l'heure d'arrêt : récupération immédiate.",
-      "Manger dans l'heure qui suit (glucides + protéines), s'hydrater, jambes surélevées.",
-      "Marche très douce le lendemain plutôt que rester immobile."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-04",
-    "t": "off",
-    "title": "Récupération complète",
-    "det": {
-     "Consigne": [
-      "Repos total. Aucune course. Marche légère si envie."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 9,
-  "label": "S9 · 5 → 11 oct",
-  "phase": "Récupération backyard",
-  "km": 30,
-  "days": [
-   {
-    "d": "2026-10-05",
-    "t": "off",
-    "title": "Repos complet",
-    "det": {
-     "Consigne": [
-      "Zéro course. Sommeil, alimentation, hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-06",
-    "t": "off",
-    "title": "Repos ou vélo très facile",
-    "det": {
-     "Consigne": [
-      "Option : 45 min de vélo tranquille (zéro impact) si les jambes le réclament."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-07",
-    "t": "renfo",
-    "title": "Footing easy 6 km + prévention (salle)",
-    "km": 6,
-    "det": {
-     "Course": [
-      "Footing 6 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-08",
-    "t": "easy",
-    "title": "Footing easy 7 km",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-09",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-10",
-    "t": "easy",
-    "title": "Footing easy 8 km",
-    "km": 8,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-11",
-    "t": "long",
-    "title": "Footing long 1h easy",
-    "km": 9,
-    "det": {
-     "Séance": [
-      "1h très easy sur terrain roulant, FC < 150.",
-      "Pas de D+, pas de descente technique : on laisse les fibres se réparer."
-     ],
-     "Note": [
-      "Si les jambes sont encore lourdes, tu raccourcis. Cette semaine est une semaine de récupération, pas une semaine d'entraînement."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 10,
-  "label": "S10 · 12 → 18 oct",
-  "phase": "Spécifique Adonis",
-  "km": 64,
-  "days": [
-   {
-    "d": "2026-10-12",
-    "t": "renfo",
-    "title": "Footing easy 8 km + prévention (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 9 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-13",
-    "t": "qual",
-    "title": "VO2 · 6 × 3 min",
-    "km": 12,
-    "fc": "188-196",
-    "pace": "3:10-3:20",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "6 × 3 min, récup 2 min.",
-      "On relance l'intensité après la backyard : si les jambes ne répondent pas, tu réduis à 4 répétitions."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-14",
-    "t": "renfo",
-    "title": "Footing easy 8 km + Force spécifique (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat 4 × 5 lourd (tempo contrôlé, jamais explosif)",
-      "Step-up sur box haute 4 × 6 / jambe — le plus spécifique de la montée",
-      "Fentes marchées lestées 3 × 10 / jambe",
-      "Hip thrust lourd 3 × 6",
-      "Mollets HSR debout 4 × 8 + assis 3 × 10",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage 8 min"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-15",
-    "t": "qual",
-    "title": "Côtes · 6 × 2 min",
-    "km": 11,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "6 × 2 min en montée soutenue, récup descente.",
-      "Reprise du travail de côtes — cœur du bloc spécifique."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-16",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-17",
-    "t": "qual",
-    "title": "Descentes · 5 × 2 min",
-    "km": 9,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "5 × 2 min descente soutenue, terrain irrégulier léger. Remontée marchée.",
-      "Reprise progressive après la coupure : on reste sur du modéré."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-18",
-    "t": "long",
-    "title": "Sortie longue 1h45 · 600 m D+",
-    "km": 16,
-    "dplus": "600 m",
-    "det": {
-     "Séance": [
-      "1h45 vallonné, Z2.",
-      "On remonte le D+ progressivement vers les 1121 m de l'Adonis."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 11,
-  "label": "S11 · 19 → 25 oct",
-  "phase": "Spécifique Adonis",
-  "km": 72,
-  "days": [
-   {
-    "d": "2026-10-19",
-    "t": "renfo",
-    "title": "Footing easy 9 km + prévention (salle)",
-    "km": 9,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-20",
-    "t": "qual",
-    "title": "Seuil · 4 × 8 min",
-    "km": 13,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "4 × 8 min au seuil, récup 2 min.",
-      "32 min de seuil : le socle de ton allure de course."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-21",
-    "t": "renfo",
-    "title": "Footing easy 10 km + Force spécifique (salle)",
-    "km": 10,
-    "det": {
-     "Course": [
-      "Footing 11 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat 4 × 5 lourd (tempo contrôlé, jamais explosif)",
-      "Step-up sur box haute 4 × 6 / jambe — le plus spécifique de la montée",
-      "Fentes marchées lestées 3 × 10 / jambe",
-      "Hip thrust lourd 3 × 6",
-      "Mollets HSR debout 4 × 8 + assis 3 × 10",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage 8 min"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-22",
-    "t": "qual",
-    "title": "Côtes seuil · 4 × 4 min",
-    "km": 12,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "4 × 4 min en montée à effort seuil, récup descente.",
-      "Si possible sur terrain irrégulier/caillouteux : les montées de l'Adonis sont techniques (terrain caussenard), pas des routes."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-23",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-24",
-    "t": "qual",
-    "title": "Descentes TECHNIQUES · 5 × 2-3 min",
-    "km": 11,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "5 × 2-3 min sur descente réellement technique (cailloux, racines, marches). Remontée marchée.",
-      "Première vraie séance technique du bloc : la descente finale du Combalou sur l'Adonis est cassante, et le calcaire peut être glissant en décembre.",
-      "Priorité à la lecture du terrain et à la fluidité, pas à la vitesse pure."
-     ],
-     "Vigilance": [
-      "Terrain technique : la malléole se réveille par accumulation d'appuis irréguliers, pas par une torsion nette. Si ça monte progressivement pendant la séance, tu coupes."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-25",
-    "t": "long",
-    "title": "Sortie longue 2h · 800 m D+",
-    "km": 17,
-    "dplus": "800 m",
-    "det": {
-     "Séance": [
-      "2h vallonné, Z2, avec un vrai profil bosselé.",
-      "Teste la nutrition : 1 flasque + gel/barre, comme sur l'Adonis."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 12,
-  "label": "S12 · 26 oct → 1 nov",
-  "phase": "Spécifique Adonis (gros bloc)",
-  "km": 78,
-  "days": [
-   {
-    "d": "2026-10-26",
-    "t": "renfo",
-    "title": "Footing easy 10 km + prévention (salle)",
-    "km": 10,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-27",
-    "t": "qual",
-    "title": "VO2 en côte · 5 × 4 min",
-    "km": 13,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "5 × 4 min en montée à effort VO2 (FC 188-196), récup descente complète.",
-      "Le format le plus rentable pour ton point faible : puissance aérobie ET spécificité montée dans la même séance."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-28",
-    "t": "renfo",
-    "title": "Footing easy 11 km + Force spécifique (salle)",
-    "km": 11,
-    "det": {
-     "Course": [
-      "Footing 11 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat 4 × 5 lourd (tempo contrôlé, jamais explosif)",
-      "Step-up sur box haute 4 × 6 / jambe — le plus spécifique de la montée",
-      "Fentes marchées lestées 3 × 10 / jambe",
-      "Hip thrust lourd 3 × 6",
-      "Mollets HSR debout 4 × 8 + assis 3 × 10",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage 8 min"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-29",
-    "t": "qual",
-    "title": "Côtes · 8 × 2 min",
-    "km": 12,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "8 × 2 min en montée soutenue, récup descente trottinée.",
-      "Grosse séance de volume en côte."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-30",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-10-31",
-    "t": "easy",
-    "title": "Footing easy 10 km + lignes droites",
-    "km": 10,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-01",
-    "t": "long",
-    "title": "Sortie longue 2h20 · 1000 m D+",
-    "km": 22,
-    "dplus": "1000 m",
-    "det": {
-     "Séance": [
-      "2h20 avec 1000 m D+ : tu approches le dénivelé de l'Adonis.",
-      "Inclure 2-3 descentes soutenues dans la sortie.",
-      "Nutrition course complète : c'est une répétition partielle."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 13,
-  "label": "S13 · 2 → 8 nov",
-  "phase": "Course test",
-  "km": 56,
-  "days": [
-   {
-    "d": "2026-11-02",
-    "t": "renfo",
-    "title": "Footing easy 9 km + prévention (salle)",
-    "km": 9,
-    "det": {
-     "Course": [
-      "Footing 9 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-03",
-    "t": "qual",
-    "title": "Seuil · 3 × 8 min",
-    "km": 12,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "3 × 8 min au seuil, récup 2 min.",
-      "Allégé : course dimanche."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-04",
-    "t": "easy",
-    "title": "Footing easy 9 km",
-    "km": 9,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Gainage léger seulement, pas de force lourde."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-05",
-    "t": "easy",
-    "title": "Footing easy 7 km + lignes droites",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-06",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Prépare la course de dimanche."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-07",
-    "t": "easy",
-    "title": "Déblocage 20 min + 3 lignes droites",
-    "km": 4,
-    "det": {
-     "Séance": [
-      "20 min très easy + 3 lignes droites."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-08",
-    "t": "race",
-    "title": "COURSE · petite course locale (objectif podium)",
-    "det": {
-     "Objectif": [
-      "Objectif podium sur un petit plateau (~300 participants) + test de forme à 4 semaines de l'Adonis."
-     ],
-     "Échauffement": [
-      "20 min footing + gammes + 4 accélérations."
-     ],
-     "Stratégie": [
-      "Course à jouer devant : place-toi tôt, mais sans exploser les 2 premiers km.",
-      "Travaille ton placement et tes relances en haut de côte — répétition tactique pour l'Adonis.",
-      "Si le parcours est très technique ou avec beaucoup de dévers, joue la sécurité : la cible reste le 6 décembre."
-     ],
-     "Note": [
-      "Dis-moi le format exact quand tu l'auras choisi, j'ajusterai la semaine autour."
-     ]
-    },
-    "km": 15
-   }
-  ]
- },
- {
-  "id": 14,
-  "label": "S14 · 9 → 15 nov",
-  "phase": "PIC spécifique",
-  "km": 80,
-  "days": [
-   {
-    "d": "2026-11-09",
-    "t": "easy",
-    "title": "Footing easy 8 km",
-    "km": 8,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Récupération post-course, très easy."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-10",
-    "t": "qual",
-    "title": "Seuil long · 3 × 12 min",
-    "km": 14,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "3 × 12 min au seuil, récup 3 min.",
-      "36 min de seuil : la plus grosse séance de seuil du bloc."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-11",
-    "t": "renfo",
-    "title": "Footing easy 11 km + Force spécifique (salle)",
-    "km": 11,
-    "det": {
-     "Course": [
-      "Footing 11 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat 4 × 5 lourd (tempo contrôlé, jamais explosif)",
-      "Step-up sur box haute 4 × 6 / jambe — le plus spécifique de la montée",
-      "Fentes marchées lestées 3 × 10 / jambe",
-      "Hip thrust lourd 3 × 6",
-      "Mollets HSR debout 4 × 8 + assis 3 × 10",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage 8 min"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-12",
-    "t": "qual",
-    "title": "Côtes longues · 5 × 5 min",
-    "km": 13,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "5 × 5 min en montée à effort seuil, récup descente.",
-      "25 min de montée soutenue : LA séance qui transforme ton point faible. Si tu n'en retiens qu'une du bloc, c'est celle-là."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-13",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-14",
-    "t": "qual",
-    "title": "Descentes techniques · 6 × 2-3 min",
-    "km": 11,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "6 × 2-3 min sur descente technique. Remontée marchée."
-     ],
-     "Vigilance": [
-      "Terrain technique : la malléole se réveille par accumulation d'appuis irréguliers, pas par une torsion nette. Si ça monte progressivement pendant la séance, tu coupes."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-15",
-    "t": "long",
-    "title": "SIMULATION ADONIS · 2h30 · 1100 m D+",
-    "km": 23,
-    "dplus": "1100 m",
-    "det": {
-     "Séance": [
-      "2h30 / 26 km / ~1100 m D+ : la réplique de l'Adonis, sur jambes déjà fatiguées par la veille.",
-      "Structure : 3 grosses bosses réparties, comme le parcours réel (Roucangel, Roc de Fabre, Combalou).",
-      "Dernier tiers : force-toi à relancer en haut de chaque côte, même fatigué."
-     ],
-     "Nutrition": [
-      "Répétition générale : un seul « ravito » autorisé au km 13 (comme sur l'Adonis). Pars avec assez de réserve pour tenir 13 km, puis recharge.",
-      "Teste exactement ce que tu porteras : flasques, gels, barres."
-     ],
-     "Matériel": [
-      "Teste la tenue de décembre (froid, humidité) et les chaussures définitives."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 15,
-  "label": "S15 · 16 → 22 nov",
-  "phase": "PIC D+ (dernier gros bloc)",
-  "km": 78,
-  "days": [
-   {
-    "d": "2026-11-16",
-    "t": "renfo",
-    "title": "Footing easy 9 km + prévention (salle)",
-    "km": 9,
-    "det": {
-     "Course": [
-      "Footing 9 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-17",
-    "t": "qual",
-    "title": "VO2 · 6 × 3 min",
-    "km": 12,
-    "fc": "188-196",
-    "pace": "3:10-3:20",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "6 × 3 min, récup 2 min.",
-      "Dernière grosse séance de VO2 : on entretient le plafond."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-18",
-    "t": "renfo",
-    "title": "Footing easy 10 km + DERNIÈRE force lourde (salle)",
-    "km": 10,
-    "det": {
-     "Course": [
-      "Footing 10 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat 4 × 5 lourd (tempo contrôlé, jamais explosif)",
-      "Step-up sur box haute 4 × 6 / jambe — le plus spécifique de la montée",
-      "Fentes marchées lestées 3 × 10 / jambe",
-      "Hip thrust lourd 3 × 6",
-      "Mollets HSR debout 4 × 8 + assis 3 × 10",
-      "Step-down excentrique 3 × 8 / jambe",
-      "Gainage 8 min"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-19",
-    "t": "qual",
-    "title": "Côtes techniques · 6 × 3 min",
-    "km": 12,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "6 × 3 min en montée technique (terrain irrégulier, cailloux), effort seuil.",
-      "Le plus proche possible des montées caussenardes de l'Adonis."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-20",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-21",
-    "t": "qual",
-    "title": "DERNIÈRE séance descentes techniques · 5 × 2 min",
-    "km": 11,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "5 × 2 min descente technique, remontée marchée."
-     ],
-     "Note": [
-      "C'est la dernière séance dure de descente du bloc : la protection musculaire acquise (effet de répétition) tient plusieurs semaines, et ça laisse 2 semaines pleines pour effacer la casse avant la course."
-     ],
-     "Vigilance": [
-      "Terrain technique : la malléole se réveille par accumulation d'appuis irréguliers, pas par une torsion nette. Si ça monte progressivement pendant la séance, tu coupes."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-22",
-    "t": "long",
-    "title": "Sortie longue 2h15 · 1000 m D+ + 30 min allure course",
-    "km": 24,
-    "dplus": "1000 m",
-    "det": {
-     "Séance": [
-      "2h15, 1000 m D+.",
-      "Au milieu : 30 min à allure course Adonis, en incluant une bosse complète.",
-      "Dernière grosse sortie du bloc."
-     ],
-     "Vigilance": [
-      "Descente = ta force, mais aussi ta zone à risque. Chaussures souples/larges (Trabuco Max 2) sur terrain irrégulier. Au 1er signal Achille gauche ou malléole droite (≥3/10), tu arrêtes la séance — pas de négociation."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 16,
-  "label": "S16 · 23 → 29 nov",
-  "phase": "Pré-affûtage (-25 %)",
-  "km": 62,
-  "days": [
-   {
-    "d": "2026-11-23",
-    "t": "renfo",
-    "title": "Footing easy 8 km + prévention (salle)",
-    "km": 8,
-    "det": {
-     "Course": [
-      "Footing 8 km easy, FC ~145."
-     ],
-     "Exercices (salle)": [
-      "Proprioception cheville : équilibre unipodal yeux fermés 3 × 30 s / pied, puis sur coussin/serviette pliée 3 × 30 s — CIBLE la malléole droite",
-      "Mollets excentriques (heel drops) 3 × 12 / jambe",
-      "Ponts fessiers unilatéraux 3 × 12 / jambe",
-      "Clamshell / abduction hanche élastique 3 × 15 / côté (prévention essuie-glace)",
-      "Gainage complet 6-8 min (planche, latérales, bird-dog)",
-      "Haut du corps si envie : pompes 3 × 12, rowing 3 × 12 / bras"
-     ],
-     "Note": [
-      "Séance courte (25-30 min), zéro fatigue dans les jambes. C'est ta séance d'assurance-vie : proprio cheville + fessiers + mollets."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-24",
-    "t": "qual",
-    "title": "Seuil · 4 × 6 min",
-    "km": 11,
-    "fc": "176-184",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "4 × 6 min au seuil, récup 2 min.",
-      "On raccourcit les blocs, on garde l'intensité : c'est ça, l'affûtage."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-25",
-    "t": "renfo",
-    "title": "Footing easy 9 km + Maintien léger (salle)",
-    "km": 9,
-    "det": {
-     "Course": [
-      "Footing 9 km easy, FC ~145. À faire avant ou à distance de la salle, comme tu préfères."
-     ],
-     "Exercices (salle)": [
-      "Mobilité 5 min",
-      "Squat 3 × 5 (charge -20 %, sensation de vitesse, aucune fatigue résiduelle)",
-      "Step-up sur box 2 × 6 / jambe",
-      "Mollets HSR 2 × 8",
-      "Gainage 6 min"
-     ],
-     "Note": [
-      "ZÉRO explosif (pas de saut, pas de salto) — c'est le déclencheur historique de ton Achille. Charges lourdes mais mouvements lents et contrôlés : c'est ça qui renforce le tendon au lieu de l'agresser."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-26",
-    "t": "qual",
-    "title": "Côtes · 4 × 3 min",
-    "km": 11,
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min easy jusqu'au pied de la côte + 3 accélérations."
-     ],
-     "Corps de séance": [
-      "4 × 3 min en montée à effort seuil, récup descente.",
-      "Volume réduit, qualité conservée."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-27",
-    "t": "off",
-    "title": "OFF (vendredi)",
-    "det": {
-     "Consigne": [
-      "Jour off fixe. Sommeil, hydratation, étirements doux si envie."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-28",
-    "t": "easy",
-    "title": "Footing easy 8 km + lignes droites",
-    "km": 8,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-11-29",
-    "t": "long",
-    "title": "Sortie longue 1h30 · 500 m D+",
-    "km": 15,
-    "dplus": "500 m",
-    "det": {
-     "Séance": [
-      "1h30 vallonné, Z2, descentes coulées non techniques.",
-      "Dernière sortie un peu longue : tu dois finir avec de la marge."
-     ]
-    }
-   }
-  ]
- },
- {
-  "id": 17,
-  "label": "S17 · 30 nov → 6 déc",
-  "phase": "Affûtage + COURSE",
-  "km": 57,
-  "days": [
-   {
-    "d": "2026-11-30",
-    "t": "easy",
-    "title": "Footing easy 7 km",
-    "km": 7,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse."
-     ]
-    }
-   },
-   {
-    "d": "2026-12-01",
-    "t": "qual",
-    "title": "Activation · 5 × 2 min allure course + 3 côtes courtes",
-    "km": 9,
-    "fc": "176-182",
-    "det": {
-     "Échauffement": [
-      "Échauffement 15-20 min très easy (FC ~145) + gammes (talons-fesses, montées de genoux, pas chassés) + 3 lignes droites progressives."
-     ],
-     "Corps de séance": [
-      "5 × 2 min à allure course, récup 2 min.",
-      "+ 3 côtes courtes de 30 s pour réveiller les jambes en montée.",
-      "Tu dois finir en te disant « j'aurais pu en faire plus ». C'est le but."
-     ],
-     "Retour au calme": [
-      "Retour au calme 10 min très easy + hydratation."
-     ]
-    }
-   },
-   {
-    "d": "2026-12-02",
-    "t": "easy",
-    "title": "Footing easy 6 km + gainage léger",
-    "km": 6,
-    "det": {
-     "Séance": [
-      "6 km easy, FC ~145.",
-      "Gainage 10 min max. Plus aucune charge lourde."
-     ]
-    }
-   },
-   {
-    "d": "2026-12-03",
-    "t": "easy",
-    "title": "Footing easy 5 km + lignes droites",
-    "km": 5,
-    "det": {
-     "Séance": [
-      "Footing easy, FC ~145 (≈ 5:15-5:25/km sur route). L'allure suit la FC, jamais l'inverse.",
-      "Fin de séance : 4-5 lignes droites de 15-20 s, rapides et RELÂCHÉES (pas de sprint sec), récup marche."
-     ]
-    }
-   },
-   {
-    "d": "2026-12-04",
-    "t": "off",
-    "title": "OFF — trajet Roquefort / retrait dossard",
-    "det": {
-     "Consigne": [
-      "Jour off fixe, parfaitement placé : route vers Roquefort-sur-Soulzon.",
-      "Retrait des dossards possible le vendredi 15h-20h à la Salle des Fêtes de Roquefort.",
-      "Compte 7 à 10 min à pied entre la salle des fêtes et la ligne de départ en centre-ville.",
-      "Hydratation, glucides, sommeil — et prépare ton sac avec les affaires chaudes (décembre sur le Larzac)."
-     ]
-    }
-   },
-   {
-    "d": "2026-12-05",
-    "t": "easy",
-    "title": "Déblocage 20 min + 3 lignes droites",
-    "km": 4,
-    "det": {
-     "Séance": [
-      "20 min très easy + 3 lignes droites de 20 s.",
-      "Reconnaissance rapide de la zone de départ/arrivée si possible."
-     ],
-     "Note": [
-      "Vérifie la météo et la liste de matériel : l'organisation peut rendre certains équipements obligatoires en cas de mauvais temps."
-     ]
-    }
-   },
-   {
-    "d": "2026-12-06",
-    "t": "race",
-    "title": "L'ADONIS TRAIL — 26 km / 1121 m D+",
-    "km": 26,
-    "dplus": "1121 m",
-    "det": {
-     "Échauffement": [
-      "20 min footing + gammes + 4 accélérations. Habille-toi chaud jusqu'au dernier moment (décembre sur le Larzac)."
-     ],
-     "Stratégie": [
-      "3 bosses réparties sur le parcours : Rocher de Roucangel, Roc de Fabre, puis la remontée finale sur le Combalou.",
-      "Les montées sont techniques (terrain caussenard), les descentes le sont globalement moins — sauf la dernière sur Roquefort, cassante et à gérer avec de la fatigue.",
-      "Départ : contiens-toi absolument les 3 premiers km. C'est TON piège identifié depuis la Grande Champagne (parti à 162 bpm, 2e moitié 38 % plus lente).",
-      "Plafond FC les 20 premières minutes : 172. Ensuite tu montes progressivement vers 176-182.",
-      "Sections roulantes (voie ferrée, causse, Pladoux) : c'est là que ta vitesse route fait la différence. Appuie sur le plat.",
-      "Relance systématiquement en haut de chaque bosse — c'est là que le peloton souffle.",
-      "Descente finale du Combalou : calcaire potentiellement glissant, jambes fatiguées. Reste lucide, c'est là que les places se perdent."
-     ],
-     "Nutrition": [
-      "UN SEUL ravitaillement, à l'ancienne gare de La Bastide Pradines (~km 13).",
-      "Pars donc en semi-autonomie : de quoi tenir 13 km (2 flasques + gels/barres), puis recharge au ravito.",
-      "Le passage au poste de ravitaillement est obligatoire.",
-      "Ton système est déjà validé sur 55 km — sur 26 km c'est confortable."
-     ],
-     "Matériel": [
-      "Bâtons autorisés (usage libre) — mais sur 26 km en ~2h30, la plupart des coureurs rapides s'en passent. À tester en prépa si tu veux.",
-      "Froid/humidité de décembre : gants + tour de cou, veste selon météo. Vérifie la liste matériel obligatoire annoncée par l'organisation."
-     ],
-     "Mental": [
-      "Plateau national relevé (541 arrivants en 2025, élites présentes). Ta course, c'est le chrono et l'index — pas la place au général.",
-      "Tu arrives avec 17 semaines de prépa propre, un point faible travaillé et zéro pépin. Fais confiance au boulot."
-     ]
-    }
-   }
-  ]
- }
-];
-
-const ZONES = [
- ["Récup / easy","~5:15 – 5:25","142 – 150"],
- ["Endurance Z2","~5:00 – 5:15","150 – 162"],
- ["Tempo","~4:00 – 4:10","165 – 172"],
- ["Seuil · allure Adonis *","~3:45 – 3:55","176 – 184"],
- ["VO2 (3-4 min)","3:10 – 3:20","188 – 196"],
- ["Lignes droites","rapide, relâché","—"],
-];
-
-const SEED_RACES = [
- {id:"seed-indre", name:"Trail des Rives de l'Indre", date:"2026-09-20", dist:"13 km", dplus:"150 m", notes:"Titre à défendre (vainqueur 2025) · très roulant · test de forme", seed:true},
- {id:"seed-byu", name:"Backyard Ultra", date:"2026-10-02", dist:"—", dplus:"—", notes:"Expérience · plafond conseillé 8-12 tours pour préserver l'Adonis", seed:true},
- {id:"seed-nov", name:"Petite course locale (à définir)", date:"2026-11-08", dist:"—", dplus:"—", notes:"Objectif podium + test 4 semaines avant l'Adonis", seed:true},
- {id:"seed-adonis", name:"L'Adonis Trail — Hivernale des Templiers", date:"2026-12-06", dist:"26 km", dplus:"1121 m", notes:"OBJECTIF · perf + index UTMB 20K · Roquefort-sur-Soulzon · 1 seul ravito (km 13)", seed:true, target:true},
-];
+let WEEKS = [];
+let ZONES = [];
+let SEED_RACES = [];
 
 let mem = {};
+/* readFailed[k] === true : la LECTURE de k a ECHOUE (storage indisponible, JSON
+   illisible). A ne JAMAIS confondre avec « cle absente », qui est le cas normal
+   d'un profil neuf et pour lequel la valeur par defaut est legitime.
+   Sans cette distinction, sget() renvoyait {} sur une lecture en echec et la
+   premiere ecriture ecrasait l'historique reel d'Enzo par ce {}. */
+let readFailed = {};
 async function sget(k, d){
+  delete readFailed[k];
   if(window.storage && window.storage.get){
-    try{ const r = await window.storage.get(k); return r ? JSON.parse(r.value) : d; }catch(e){ return d; }
+    try{
+      const r = await window.storage.get(k);
+      if(!r) return d;                 // cle absente : cas normal
+      return JSON.parse(r.value);
+    }catch(e){ readFailed[k] = true; return d; }
   }
-  try{ const v = localStorage.getItem(k); return v!==null ? JSON.parse(v) : d; }catch(e){}
-  return (k in mem) ? mem[k] : d;
+  try{
+    const v = localStorage.getItem(k);
+    if(v === null) return d;           // cle absente : cas normal
+    return JSON.parse(v);
+  }catch(e){ readFailed[k] = true; }
+  if(k in mem){ delete readFailed[k]; return mem[k]; }
+  return d;
 }
+/* Renvoie true si la valeur a bien ete PERSISTEE, false sinon (quota depasse,
+   mode prive, serialisation impossible). La valeur reste toujours en memoire.
+   Les appels existants ignorent la valeur de retour : signature compatible. */
 async function sset(k, v){
   mem[k] = v;
+  let str;
+  try{ str = JSON.stringify(v); }catch(e){ return false; }
   if(window.storage && window.storage.set){
-    try{ await window.storage.set(k, JSON.stringify(v)); return; }catch(e){}
+    try{ await window.storage.set(k, str); return true; }catch(e){}
   }
-  try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
+  try{ localStorage.setItem(k, str); return true; }catch(e){}
+  return false;
+}
+async function sdel(k){
+  delete mem[k];
+  if(window.storage){
+    try{
+      if(window.storage.delete) await window.storage.delete(k);
+      else if(window.storage.remove) await window.storage.remove(k);
+      else if(window.storage.set) await window.storage.set(k, "null");
+    }catch(e){}
+  }
+  try{ localStorage.removeItem(k); }catch(e){}
+}
+
+/* ======================================================================
+   ECRITURE DES DONNEES UTILISATEUR (tgcm-done / tgcm-log / tgcm-races)
+   Ce sont les seules donnees irremplacables d'Enzo (seances faites, journal
+   de ressenti et de genes, courses). Un echec d'ecriture ne doit JAMAIS
+   passer inapercu : bandeau persistant + marquage visuel + toast.
+   ====================================================================== */
+const USER_KEYS = ["tgcm-done", "tgcm-log", "tgcm-races"];
+const USER_KEY_LABEL = {
+  "tgcm-done": "tes séances cochées",
+  "tgcm-log": "ton journal (ressentis et gênes)",
+  "tgcm-races": "tes courses"
+};
+function brokenKeysLabel(){
+  const l = USER_KEYS.filter(function(k){ return !!readFailed[k]; }).map(function(k){ return USER_KEY_LABEL[k]; });
+  if(!l.length) return "tes données";
+  if(l.length === 1) return l[0];
+  return l.slice(0, -1).join(", ") + " et " + l[l.length-1];
+}
+let SAVE_FAILED = false;      // derniere ecriture de donnees utilisateur en echec
+let READ_BROKEN = false;      // au moins une cle tgcm-* n'a PAS pu etre lue
+let unsavedDays = {};         // dates ISO modifiees mais non persistees
+const SAVE_TOAST = "⚠ Non enregistré — stockage plein.";
+function saveFailMsg(prefix, key){
+  if(key && readFailed[key]){
+    // Tournure volontairement sans accord : les libelles sont tantot au
+    // singulier (« ton journal »), tantot au pluriel (« tes courses »).
+    return "⚠ Refusé : impossible de lire " + USER_KEY_LABEL[key] + " sur cet appareil. "
+      + "Rien n'est modifié, pour ne pas écraser ton historique. Ferme et rouvre l'app.";
+  }
+  return (prefix || SAVE_TOAST) + " Libère de l'espace, sors de la navigation privée, et exporte tes données.";
+}
+
+function renderSaveBanner(){
+  const el = $("savealert"); if(!el) return;
+  const show = SAVE_FAILED || READ_BROKEN;
+  el.classList.toggle("hidden", !show);
+  // Evite la double marge d'encoche : header et bandeau ajoutent tous deux
+  // env(safe-area-inset-top). Quand le bandeau est la, c'est lui qui la porte.
+  document.body.classList.toggle("hasalert", show);
+  $("savealert-read").classList.toggle("hidden", !READ_BROKEN);
+  $("savealert-write").classList.toggle("hidden", READ_BROKEN);
+  if(READ_BROKEN) $("savealert-what").textContent = brokenKeysLabel();
+  // L'export reste accessible dans les DEUX modes : le masquer ne protegeait de
+  // rien (#btnexport de l'onglet Journal restait actif) et privait Enzo du
+  // raccourci. C'est l'export lui-meme qui sait desormais qu'il est partiel :
+  // avertissement prealable + marquage `partial`/`unreadable` dans le fichier.
+  $("savealert-export").textContent = READ_BROKEN
+    ? "Exporter ce qui est lisible (export partiel)"
+    : "Exporter mes données maintenant";
+}
+/* Fige l'etat de lecture des cles utilisateur apres le chargement initial. */
+function noteReadFailures(){
+  READ_BROKEN = USER_KEYS.some(function(k){ return !!readFailed[k]; });
+  if(READ_BROKEN) renderSaveBanner();
+}
+/* Wrapper de sset() pour les donnees utilisateur. Chemin nominal inchange :
+   si l'ecriture reussit, aucun effet de bord visible.
+   `force` = restauration explicite depuis une sauvegarde (seul cas ou l'on
+   accepte d'ecrire par-dessus une cle qu'on n'a pas su lire). */
+async function saveUser(k, v, iso, force){
+  // Cause racine : on n'ecrase JAMAIS une cle dont la lecture a echoue par ce
+  // qu'on a en memoire — ce serait detruire l'historique qu'on n'a pas su lire.
+  if(!force && readFailed[k]){
+    if(iso) unsavedDays[iso] = true;
+    READ_BROKEN = true;
+    renderSaveBanner();
+    return false;
+  }
+  const ok = await sset(k, v);
+  if(ok){
+    if(force && readFailed[k]){
+      delete readFailed[k];
+      READ_BROKEN = USER_KEYS.some(function(x){ return !!readFailed[x]; });
+    }
+    // sset ecrit l'objet ENTIER : un succes rattrape tout ce qui etait en attente.
+    unsavedDays = {};
+    SAVE_FAILED = false;
+    renderSaveBanner();
+  } else {
+    if(iso) unsavedDays[iso] = true;
+    SAVE_FAILED = true;
+    renderSaveBanner();
+  }
+  return ok;
+}
+/* Sonde d'ecriture sur une cle JETABLE : elle ne doit jamais toucher
+   tgcm-done / tgcm-log / tgcm-races. Nettoyee immediatement apres. */
+async function storageProbe(){
+  const ok = await sset("tgcm-probe", 1);
+  if(ok){
+    try{ await sdel("tgcm-probe"); }catch(e){}
+    if(SAVE_FAILED){ SAVE_FAILED = false; renderSaveBanner(); }
+  } else {
+    SAVE_FAILED = true;
+    renderSaveBanner();
+  }
+  return ok;
 }
 
 let done = {};
@@ -2526,9 +549,13 @@ const FEEL_EMO = {good:"👍", ok:"😐", hard:"🥵"};
 const PAINS = [["ras","RAS"],["achille","Achille G"],["malleole","Malléole D"],["genou","Genou"]];
 const PAIN_LABEL = {achille:"Achille G", malleole:"Malléole D", genou:"Genou", ras:"RAS"};
 const DAY_ICO = {race:"🏁", off:"🌙", renfo:"🏋️", qual:"🔥", long:"🥾", easy:"👟"};
-function weekKm(w){ return w.days.reduce(function(s,d){ return s + (d.km||0); }, 0); }
-function findDay(iso){ for(const w of WEEKS){ for(const d of w.days){ if(d.d===iso) return d; } } return null; }
-function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+/* INVARIANT 1 : le km hebdo est TOUJOURS la somme des km des seances.
+   Ne jamais lire un champ `km` declare au niveau de la semaine. */
+function weekKm(w){ return arr(w && w.days).reduce(function(s,d){ return s + ((d && typeof d.km==="number" && isFinite(d.km)) ? d.km : 0); }, 0); }
+function findDay(iso){ for(const w of WEEKS){ for(const d of arr(w && w.days)){ if(d && d.d===iso) return d; } } return null; }
+/* esc() tolere desormais les non-chaines (nombres, valeurs d'un plan importe) :
+   avec l'ancien `(s||"")`, esc(5) levait un TypeError sur .replace. */
+function esc(s){ return (s===undefined||s===null ? "" : String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function escAttr(s){ return esc(s).replace(/"/g,"&quot;"); }
 function todayISO(){ const n=new Date(); return n.toISOString().slice(0,10); }
 function frDate(iso){ const d=new Date(iso+"T12:00"); return d.toLocaleDateString("fr-FR",{weekday:"short", day:"numeric", month:"short"}); }
@@ -2536,8 +563,375 @@ function dow(iso){ return ["DIM","LUN","MAR","MER","JEU","VEN","SAM"][new Date(i
 function dnum(iso){ const d=new Date(iso+"T12:00"); return d.getDate()+"/"+String(d.getMonth()+1).padStart(2,"0"); }
 function daysTo(iso){ return Math.ceil((new Date(iso+"T12:00") - new Date()) / 86400000); }
 
+/* ======================================================================
+   PLAN : validation stricte, chargement, application
+   Le plan vit dans plan.json (ou dans l'override localStorage `plan-override`).
+   INVARIANT 1 : aucun km de niveau semaine n'est lu ici — weekKm() reste
+   la seule source du kilometrage hebdomadaire.
+   ====================================================================== */
+const PLAN_URL = "./plan.json";
+const DAY_TYPES = ["off","easy","qual","long","renfo","race"];
+let PLAN = null;         // objet plan actif
+let PLAN_SOURCE = "";    // "default" | "override"
+let PLAN_CACHED = false; // servi depuis le cache hors-ligne
+let PLAN_PENDING_OVERRIDE = null; // override conserve mais ignore (version < plan.json)
+let pendingPlan = null;  // plan valide, en attente de confirmation
+
+function isPlainObject(v){ return !!v && typeof v==="object" && !Array.isArray(v); }
+function isISODate(s){
+  if(typeof s!=="string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const y=+s.slice(0,4), m=+s.slice(5,7), d=+s.slice(8,10);
+  if(m<1 || m>12 || d<1 || d>31) return false;
+  const dt = new Date(Date.UTC(y, m-1, d));
+  return dt.getUTCFullYear()===y && (dt.getUTCMonth()+1)===m && dt.getUTCDate()===d;
+}
+function frNum(iso){ return isISODate(iso) ? iso.slice(8,10)+"/"+iso.slice(5,7)+"/"+iso.slice(0,4) : String(iso); }
+
+/* arr() : ne JAMAIS supposer qu'une valeur "vraie" est un tableau.
+   `|| []` laissait passer {"weeks":{}} ou "days":"x" -> TypeError non rattrapee. */
+function arr(v){ return Array.isArray(v) ? v : []; }
+
+function planStats(p){
+  let days=0, start="", end="";
+  arr(p && p.weeks).forEach(function(w){
+    arr(w && w.days).forEach(function(d){
+      days++;
+      if(d && typeof d.d==="string"){
+        if(!start || d.d<start) start=d.d;
+        if(!end || d.d>end) end=d.d;
+      }
+    });
+  });
+  const upd = (p && typeof p.updated==="string") ? p.updated : "";
+  return { version:(p?p.version:null), updated:upd, weeks:arr(p && p.weeks).length,
+           days:days, start:start, end:end };
+}
+
+function validatePlan(obj){
+  const errors = [];
+  const push = function(m){ if(errors.length<300) errors.push(m); };
+  if(!isPlainObject(obj)){
+    return {ok:false, errors:["Le plan doit être un objet JSON (accolades à la racine)."], summary:planStats(null)};
+  }
+  if(!Number.isInteger(obj.version)) push("Champ « version » manquant ou non entier (reçu : "+JSON.stringify(obj.version)+").");
+  if(obj.updated!==undefined && typeof obj.updated!=="string") push("Champ « updated » : chaîne attendue (ex. \"2026-08-13\").");
+  if(!Array.isArray(obj.weeks) || obj.weeks.length===0){
+    push("Champ « weeks » : tableau non vide attendu.");
+    return {ok:false, errors:errors, summary:planStats(obj)};
+  }
+
+  const seen = Object.create(null);
+  obj.weeks.forEach(function(w, wi){
+    const pos = "Semaine "+(wi+1);
+    if(!isPlainObject(w)){ push(pos+" : objet attendu."); return; }
+    const lbl = (typeof w.label==="string" && w.label) ? w.label : ("S"+(w.id!==undefined ? w.id : (wi+1)));
+    ["id","label","phase"].forEach(function(k){
+      if(w[k]===undefined || w[k]===null || w[k]==="") push(lbl+" : champ « "+k+" » manquant.");
+    });
+    if(!Array.isArray(w.days) || w.days.length===0){ push(lbl+" : « days » doit être un tableau non vide."); return; }
+    w.days.forEach(function(d, di){
+      if(!isPlainObject(d)){ push(lbl+" · jour n°"+(di+1)+" : objet attendu."); return; }
+      const where = lbl+" · jour "+((typeof d.d==="string" && d.d) ? d.d : ("n°"+(di+1)));
+      if(!isISODate(d.d)){
+        push(where+" : date "+JSON.stringify(d.d)+" invalide (format AAAA-MM-JJ et date réellement existante).");
+      } else if(seen[d.d]){
+        push(where+" : date en double, déjà utilisée par "+seen[d.d]+".");
+      } else {
+        seen[d.d] = lbl;
+      }
+      if(DAY_TYPES.indexOf(d.t)<0) push(where+" : type "+JSON.stringify(d.t)+" inconnu (attendu : "+DAY_TYPES.join(", ")+").");
+      if(typeof d.title!=="string" || !d.title.trim()) push(where+" : champ « title » manquant ou vide.");
+      if(d.km!==undefined && (typeof d.km!=="number" || !isFinite(d.km) || d.km<0)) push(where+" : « km » doit être un nombre positif.");
+      if(d.det!==undefined){
+        if(!isPlainObject(d.det)){ push(where+" : « det » doit être un objet (titre de section → tableau de lignes)."); }
+        else {
+          Object.keys(d.det).forEach(function(k){
+            const v = d.det[k];
+            if(!Array.isArray(v)) push(where+" : det[\""+k+"\"] doit être un tableau de chaînes.");
+            else if(v.some(function(x){ return typeof x!=="string"; })) push(where+" : det[\""+k+"\"] contient une valeur qui n'est pas du texte.");
+          });
+        }
+      }
+    });
+  });
+
+  if(obj.zones!==undefined){
+    if(!Array.isArray(obj.zones)) push("Champ « zones » : tableau attendu.");
+    else obj.zones.forEach(function(z, i){
+      if(!Array.isArray(z) || z.length!==3 || z.some(function(x){ return typeof x!=="string"; }))
+        push("zones ligne "+(i+1)+" : tableau de 3 chaînes attendu [libellé, allure, FC].");
+    });
+  }
+  if(obj.races!==undefined){
+    if(!Array.isArray(obj.races)) push("Champ « races » : tableau attendu.");
+    else obj.races.forEach(function(r, i){
+      const n = "races n°"+(i+1)+((isPlainObject(r) && typeof r.name==="string" && r.name) ? " ("+r.name+")" : "");
+      if(!isPlainObject(r)){ push(n+" : objet attendu."); return; }
+      if(typeof r.id!=="string" || !r.id) push(n+" : champ « id » manquant.");
+      if(typeof r.name!=="string" || !r.name) push(n+" : champ « name » manquant.");
+      if(!isISODate(r.date)) push(n+" : date "+JSON.stringify(r.date)+" invalide (AAAA-MM-JJ).");
+    });
+  }
+  if(obj.race!==undefined){
+    if(!isPlainObject(obj.race)) push("Champ « race » : objet attendu.");
+    else if(!isISODate(obj.race.date)) push("race.date : date "+JSON.stringify(obj.race.date)+" invalide (AAAA-MM-JJ).");
+  }
+
+  return {ok: errors.length===0, errors: errors, summary: planStats(obj)};
+}
+
+function formatErrors(errs, max){
+  max = max || 10;
+  const out = errs.slice(0, max).map(function(e){ return "• "+e; });
+  if(errs.length>max) out.push("… et "+(errs.length-max)+" autres.");
+  return out.join("\n");
+}
+
+function lastPlanDate(){
+  let mx = "";
+  WEEKS.forEach(function(w){ arr(w && w.days).forEach(function(d){ if(d && typeof d.d==="string" && d.d>mx) mx=d.d; }); });
+  return mx;
+}
+/* L'en-tete est traite comme un TOUT : on n'affiche jamais un melange
+   de deux courses (titre du nouveau plan sous le sous-titre de l'ancien). */
+function raceMeta(){
+  if(!PLAN) return null;
+  const str = function(v){ return (typeof v==="string" && v.trim()) ? v : ""; };
+  const r = isPlainObject(PLAN.race) ? PLAN.race : null;
+  if(r){
+    // Bloc `race` fourni : il fait foi EN ENTIER, champs manquants neutralises.
+    return {
+      eyebrow: str(r.eyebrow) || "Objectif",
+      name:    str(r.name)    || "Objectif à définir",
+      subtitle:str(r.subtitle),
+      date:    isISODate(r.date) ? r.date : lastPlanDate()
+    };
+  }
+  // Pas de bloc `race` : on derive d'UNE SEULE source coherente.
+  const tgt = arr(PLAN.races).filter(function(x){
+    return isPlainObject(x) && x.target && isISODate(x.date) && str(x.name);
+  })[0];
+  if(tgt){
+    const bits = [];
+    if(str(tgt.dist)  && tgt.dist!=="—")  bits.push(tgt.dist);
+    if(str(tgt.dplus) && tgt.dplus!=="—") bits.push(tgt.dplus+" D+");
+    if(str(tgt.notes)) bits.push(tgt.notes);
+    return { eyebrow:"Objectif", name:tgt.name, subtitle:bits.join(" · "), date:tgt.date };
+  }
+  const last = lastPlanDate();
+  return {
+    eyebrow: "Plan d'entraînement",
+    name: "Objectif à définir",
+    subtitle: last ? ("Plan jusqu'au "+frNum(last)) : "",
+    date: last
+  };
+}
+function applyRaceMeta(){
+  const m = raceMeta();
+  if(m){
+    $("hdr-eyebrow").textContent = m.eyebrow;
+    $("hdr-title").textContent   = m.name;
+    $("hdr-sub").textContent     = m.subtitle;
+    $("hdr-sub").classList.toggle("hidden", !m.subtitle);
+  }
+  // PLAN null : on laisse le contenu de repli du HTML statique intact (pas de melange),
+  // seul le compte a rebours est neutralise.
+  const dj = RACE_DAY ? daysTo(RACE_DAY) : null;
+  $("jj").textContent = (dj===null) ? "J-–" : (dj>0 ? "J-"+dj : (dj===0 ? "JOUR J" : "Finie !"));
+}
+/* Seul point d'entree pour installer un plan en memoire. */
+function applyPlan(plan, source, cached){
+  PLAN = plan;
+  PLAN_SOURCE = source || "default";
+  PLAN_CACHED = !!cached;
+  WEEKS = arr(plan && plan.weeks);
+  ZONES = arr(plan && plan.zones);
+  SEED_RACES = arr(plan && plan.races);
+  const m = raceMeta();
+  RACE_DAY = m ? m.date : "";
+  applyRaceMeta();
+}
+function planProvenance(){
+  if(PLAN_SOURCE==="override") return "plan importé";
+  return PLAN_CACHED ? "plan par défaut (cache hors-ligne)" : "plan par défaut";
+}
+function renderVersionLine(){
+  const el = $("versionline"); if(!el) return;
+  if(!PLAN){ el.textContent = "Plan indisponible — vérifie ta connexion."; return; }
+  const s = planStats(PLAN);
+  el.textContent = "Plan v"+PLAN.version+" · "+(s.updated ? "mis à jour le "+frNum(s.updated) : "date inconnue")
+    + " · " + planProvenance() + " · " + s.weeks + " semaines ("+frNum(s.start)+" → "+frNum(s.end)+")";
+}
+function renderPlanCard(){
+  const el = $("planinfo"); if(!el) return;
+  if(!PLAN){ el.textContent = "Aucun plan actif sur cet appareil. Colle un JSON de plan ci-dessous pour démarrer."; return; }
+  const s = planStats(PLAN);
+  let txt = "Plan actif : v"+PLAN.version+" · "+(s.updated ? "mis à jour le "+frNum(s.updated) : "date inconnue")
+    + " · " + planProvenance() + " · " + s.weeks + " semaines · " + s.days + " jours (du "+frNum(s.start)+" au "+frNum(s.end)+").";
+  // B15 : un override ecarte pour version inferieure doit etre signale, sinon
+  // Enzo peut croire son import perdu (il est conserve, juste pas applique).
+  if(PLAN_PENDING_OVERRIDE){
+    txt += "\nUn plan importé v"+PLAN_PENDING_OVERRIDE.override+" est conservé mais ignoré : plan.json est en v"
+        + PLAN_PENDING_OVERRIDE.def + ". Il sera repris si tu importes une version ≥ "+PLAN_PENDING_OVERRIDE.def+".";
+  }
+  el.textContent = txt;
+}
+function renderZones(){
+  $("zonesbody").innerHTML = arr(ZONES).map(function(z){
+    const c = arr(z);
+    return '<tr><td>'+esc(c[0])+'</td><td><b>'+esc(c[1])+'</b></td><td><b>'+esc(c[2])+'</b></td></tr>';
+  }).join("");
+}
+
+/* B3 : un reseau qui pend (portail captif, 4G faible) ne doit pas figer l'app.
+   8 s max, puis on bascule sur le cache hors-ligne. */
+const PLAN_FETCH_TIMEOUT = 8000;
+function planTimeoutError(){
+  const e = new Error("délai dépassé");
+  e.name = "PlanTimeout";
+  return e;
+}
+async function fetchPlanJSON(){
+  let ctl = null, timer = null;
+  try{
+    let opts = {cache:"no-store"};
+    if(typeof AbortController!=="undefined"){
+      ctl = new AbortController();
+      opts.signal = ctl.signal;
+    }
+    // Course entre la requete et un minuteur qui REJETTE : le delai tient meme si
+    // fetch (ou res.json()) n'honore pas le signal d'abandon. L'abort reste envoye
+    // pour liberer la connexion.
+    const guard = new Promise(function(_, reject){
+      timer = setTimeout(function(){
+        if(ctl){ try{ ctl.abort(); }catch(e){} }
+        reject(planTimeoutError());
+      }, PLAN_FETCH_TIMEOUT);
+    });
+    const work = (async function(){
+      const res = await fetch(PLAN_URL, opts);
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      return await res.json();
+    })();
+    return await Promise.race([work, guard]);
+  }finally{
+    if(timer) clearTimeout(timer);
+  }
+}
+function isTimeoutErr(e){ return !!e && (e.name==="PlanTimeout" || e.name==="AbortError"); }
+/* validatePlan ne doit jamais pouvoir faire tomber l'app, quelle que soit l'entree. */
+function safeValid(o){
+  try{ return validatePlan(o); }
+  catch(e){
+    return {ok:false, errors:["Plan illisible : "+((e && e.message) || String(e))],
+            summary:{version:null, updated:"", weeks:0, days:0, start:"", end:""}};
+  }
+}
+/* Ordre : override (si version >= plan.json) > plan.json > cache hors-ligne.
+   Ne LEVE JAMAIS : renvoie toujours un objet resultat. */
+async function resolvePlan(){
+  try{
+    let override = null;
+    try{ override = await sget("plan-override", null); }catch(e){}
+    if(override && !safeValid(override).ok) override = null;
+
+    let def = null, err = null;
+    try{ def = await fetchPlanJSON(); }
+    catch(e){
+      err = isTimeoutErr(e)
+        ? "plan.json n'a pas répondu en "+(PLAN_FETCH_TIMEOUT/1000)+" s"
+        : ((e && e.message) ? e.message : "réseau indisponible");
+    }
+    if(def){
+      if(safeValid(def).ok){ try{ await sset("plan-cache", def); }catch(e){} }
+      else { def = null; err = "plan.json trouvé mais invalide"; }
+    }
+
+    if(override && def){
+      if(override.version >= def.version) return {plan:override, source:"override"};
+      return {plan:def, source:"default",
+              pendingOverride:{override:override.version, def:def.version}};
+    }
+    if(override) return {plan:override, source:"override"};
+    if(def) return {plan:def, source:"default"};
+
+    let cached = null;
+    try{ cached = await sget("plan-cache", null); }catch(e){}
+    if(cached && safeValid(cached).ok) return {plan:cached, source:"default", cached:true};
+    return {plan:null, source:"", error:err};
+  }catch(e){
+    return {plan:null, source:"", error:((e && e.message) || String(e))};
+  }
+}
+function showPlanError(detail){
+  $("days").innerHTML =
+    '<div class="card care"><h3>⚠ Plan indisponible</h3>'
+    + '<p class="note" style="margin-top:0">Plan indisponible — vérifie ta connexion. Aucun plan n\'est encore enregistré sur cet appareil.</p>'
+    + (detail ? '<p class="note">Détail technique : '+esc(String(detail))+'</p>' : '')
+    + '<p class="note">Tu peux aussi coller un JSON de plan dans l\'onglet <b>Zones</b> › « Mettre à jour le plan ».</p>'
+    + '<div class="frow" style="margin-top:10px"><button class="btn primary" type="button" id="planretry">Réessayer</button></div></div>';
+  $("wktitle").textContent = "—";
+  $("wkmeta").textContent = "Aucun plan chargé";
+  $("loadsvg").innerHTML = "";
+  $("prevwk").disabled = true; $("nextwk").disabled = true;
+  $("todaycard").innerHTML = '<div class="today-card restday"><span class="tc-ico">🌙</span><div class="tc-main"><div class="tc-title">Plan indisponible</div><div class="tc-sub">Vérifie ta connexion, puis réessaie</div></div></div>';
+  const b = $("planretry");
+  if(b) b.addEventListener("click", function(){ reloadPlan(true); });
+}
+function renderAll(){
+  renderZones(); renderRaces(); renderJournal(); renderProgress();
+  renderVersionLine(); renderPlanCard();
+  if(!WEEKS.length) return;
+  const t = todayISO();
+  let idx = WEEKS.findIndex(function(w){
+    const ds = arr(w && w.days);
+    return ds.length && t >= ds[0].d && t <= ds[ds.length-1].d;
+  });
+  if(idx === -1){
+    const first = arr(WEEKS[0] && WEEKS[0].days);
+    idx = (first.length && t < first[0].d) ? 0 : WEEKS.length-1;
+  }
+  curWk = Math.max(0, idx);
+  renderWeek(); renderToday();
+}
+/* Remet l'app dans un etat vide + ecran d'erreur. Ne doit jamais lever. */
+function failToPlanError(detail){
+  PLAN = null; PLAN_SOURCE = ""; PLAN_CACHED = false; PLAN_PENDING_OVERRIDE = null;
+  WEEKS = []; ZONES = []; SEED_RACES = []; RACE_DAY = "";
+  try{ applyRaceMeta(); }catch(e){}
+  try{ renderAll(); }catch(e){}
+  try{ showPlanError(detail); }catch(e){
+    try{ $("days").textContent = "Plan indisponible — vérifie ta connexion."; }catch(_){}
+  }
+}
+/* REGLE ABSOLUE : quoi qu'il arrive, on ne reste jamais sur « Chargement du plan… ».
+   Le pire cas possible est l'ecran d'erreur avec bouton Réessayer. */
+async function reloadPlan(notify){
+  let r;
+  try{ r = await resolvePlan(); }
+  catch(e){ r = {plan:null, source:"", error:((e && e.message) || String(e))}; }
+
+  if(!r || !r.plan){
+    failToPlanError(r && r.error);
+    if(notify) toast("Plan indisponible ✗");
+    return false;
+  }
+  try{
+    applyPlan(r.plan, r.source, r.cached);
+    PLAN_PENDING_OVERRIDE = r.pendingOverride || null;
+    renderAll();
+  }catch(e){
+    failToPlanError("plan illisible — "+((e && e.message) || String(e)));
+    if(notify) toast("Plan illisible ✗");
+    return false;
+  }
+  if(notify) toast("Plan rechargé ✓");
+  return true;
+}
+
 function drawProfile(){
-  const kms = WEEKS.map(weekKm), max = Math.max(...kms);
+  if(!WEEKS.length){ $("loadsvg").innerHTML=""; return; }
+  const kms = WEEKS.map(weekKm), max = Math.max.apply(null, kms) || 1;
   const W=360, H=86, pad=14, bw=(W-pad*2)/WEEKS.length;
   let pts = kms.map((k,i)=>[pad+bw*i+bw/2, H-12-(k/max)*(H-30)]);
   let path = "M"+pts.map(p=>p[0]+","+p[1]).join(" L");
@@ -2553,6 +947,7 @@ function drawProfile(){
 
 function renderWeek(){
   const w = WEEKS[curWk];
+  if(!w) return;
   $("wktitle").textContent = w.label;
   const nDone = w.days.filter(d=>done[d.d]).length;
   const nS = w.days.filter(d=>d.t!=="off").length;
@@ -2563,12 +958,13 @@ function renderWeek(){
   $("days").innerHTML = "";
   w.days.forEach(day=>{
     const b = document.createElement("button");
-    b.className = "day "+(day.t==="long"?"qual":day.t)+(done[day.d]?" done":"")+(day.d===tISO?" today":"");
-    let chips = '<span class="chip">'+TYPE_LABEL[day.t]+'</span>';
-    if(day.km) chips += '<span class="chip">≈ '+day.km+' km</span>';
-    if(day.fc) chips += '<span class="chip hot">FC '+day.fc+'</span>';
-    if(day.pace) chips += '<span class="chip hot">'+day.pace+'/km</span>';
-    b.innerHTML = '<span class="bar"></span><span class="datecol"><span class="dow">'+dow(day.d)+'</span><span class="dnum">'+dnum(day.d)+'</span></span><span class="main"><span class="stitle">'+day.title+'</span><span class="schips">'+chips+'</span></span><span class="checkcol"><span class="check">✓</span></span>';
+    b.className = "day "+(day.t==="long"?"qual":day.t)+(done[day.d]?" done":"")+(day.d===tISO?" today":"")+(unsavedDays[day.d]?" unsaved":"");
+    let chips = '<span class="chip">'+esc(TYPE_LABEL[day.t])+'</span>';
+    if(unsavedDays[day.d]) chips += '<span class="chip care">⚠ non enregistré</span>';
+    if(day.km) chips += '<span class="chip">≈ '+esc(day.km)+' km</span>';
+    if(day.fc) chips += '<span class="chip hot">FC '+esc(day.fc)+'</span>';
+    if(day.pace) chips += '<span class="chip hot">'+esc(day.pace)+'/km</span>';
+    b.innerHTML = '<span class="bar"></span><span class="datecol"><span class="dow">'+esc(dow(day.d))+'</span><span class="dnum">'+esc(dnum(day.d))+'</span></span><span class="main"><span class="stitle">'+esc(day.title)+'</span><span class="schips">'+chips+'</span></span><span class="checkcol"><span class="check">✓</span></span>';
     b.addEventListener("click", ()=>openSheet(day));
     $("days").appendChild(b);
   });
@@ -2580,16 +976,19 @@ function openSheet(day){
   $("sheettag").textContent = frDate(day.d)+" · "+TYPE_LABEL[day.t];
   $("sheettitle").textContent = day.title;
   let chips = "";
-  if(day.km) chips += '<span class="chip">≈ '+day.km+' km</span>';
-  if(day.fc) chips += '<span class="chip hot">FC '+day.fc+'</span>';
-  if(day.pace) chips += '<span class="chip hot">'+day.pace+'/km</span>';
+  if(day.km) chips += '<span class="chip">≈ '+esc(day.km)+' km</span>';
+  if(day.fc) chips += '<span class="chip hot">FC '+esc(day.fc)+'</span>';
+  if(day.pace) chips += '<span class="chip hot">'+esc(day.pace)+'/km</span>';
   $("sheetchips").innerHTML = chips;
   let html = "";
-  for(const [sec, items] of Object.entries(day.det||{})){
+  for(const [sec, items] of Object.entries(isPlainObject(day.det) ? day.det : {})){
+    // La comparaison se fait sur la cle BRUTE : le style d'alerte ambre de
+    // « Vigilance » ne doit jamais dependre de l'echappement.
     const warn = (sec==="Vigilance");
-    html += '<div class="sec'+(warn?' warn':'')+'"><h3>'+(warn?'⚠ ':'')+sec+'</h3>';
-    if(items.length>1 || sec.startsWith("Exercices")) html += "<ul>"+items.map(i=>'<li>'+i+'</li>').join("")+"</ul>";
-    else html += items.map(i=>'<p>'+i+'</p>').join("");
+    const list = arr(items);
+    html += '<div class="sec'+(warn?' warn':'')+'"><h3>'+(warn?'⚠ ':'')+esc(sec)+'</h3>';
+    if(list.length>1 || sec.startsWith("Exercices")) html += "<ul>"+list.map(i=>'<li>'+esc(i)+'</li>').join("")+"</ul>";
+    else html += list.map(i=>'<p>'+esc(i)+'</p>').join("");
     html += "</div>";
   }
   html += journalEditorHTML(day);
@@ -2603,16 +1002,19 @@ $("overlay").addEventListener("click", closeSheet);
 $("closesheet").addEventListener("click", closeSheet);
 $("togdone").addEventListener("click", async ()=>{
   if(!sheetDay) return;
-  if(done[sheetDay.d]) delete done[sheetDay.d]; else done[sheetDay.d]=true;
-  await sset("tgcm-done", done);
-  toast(done[sheetDay.d] ? "Séance validée 💪" : "Séance décochée");
+  const iso = sheetDay.d;
+  if(done[iso]) delete done[iso]; else done[iso]=true;
+  const ok = await saveUser("tgcm-done", done, iso);
+  // Jamais « Séance validée 💪 » si rien n'a ete enregistre.
+  if(ok) toast(done[iso] ? "Séance validée 💪" : "Séance décochée");
+  else toast(saveFailMsg(null, "tgcm-done"), 7000);
   closeSheet(); renderWeek(); renderToday(); renderProgress();
 });
 
 function journalEditorHTML(day){
   const e = log[day.d] || {};
   const feel = '<div class="pick">'+FEELS.map(f=>'<button type="button" data-feel="'+f[0]+'" class="'+(e.feel===f[0]?'on':'')+'">'+f[1]+'</button>').join('')+'</div>';
-  const pains = e.pain || [];
+  const pains = arr(e.pain);
   const pain = '<div class="pick pain">'+PAINS.map(p=>'<button type="button" data-pain="'+p[0]+'" class="'+(p[0]==='ras'?'ras ':'')+(pains.indexOf(p[0])>-1?'on':'')+'">'+p[1]+'</button>').join('')+'</div>';
   return '<div class="jnl"><h3>Mon ressenti</h3>'
     + '<div class="lab">Sensation</div>'+feel
@@ -2631,7 +1033,9 @@ function bindJournalEditor(day){
   async function persist(){
     const e = log[day.d];
     if(e && !e.feel && !e.metric && !e.sleep && !e.rhr && (!e.pain||!e.pain.length) && !e.note) delete log[day.d];
-    await sset("tgcm-log", log); renderJournal(); renderWeek(); renderToday();
+    const ok = await saveUser("tgcm-log", log, day.d);
+    if(!ok) toast(saveFailMsg(null, "tgcm-log"), 7000);
+    renderJournal(); renderWeek(); renderToday();
   }
   body.querySelectorAll('[data-feel]').forEach(function(btn){ btn.addEventListener('click', async function(){
     const e=cur(); e.feel = (e.feel===btn.dataset.feel) ? '' : btn.dataset.feel;
@@ -2639,7 +1043,7 @@ function bindJournalEditor(day){
     await persist();
   }); });
   body.querySelectorAll('[data-pain]').forEach(function(btn){ btn.addEventListener('click', async function(){
-    const e=cur(); let p=e.pain||[]; const v=btn.dataset.pain;
+    const e=cur(); let p=arr(e.pain); const v=btn.dataset.pain;
     if(v==='ras'){ p = p.indexOf('ras')>-1 ? [] : ['ras']; }
     else { p = p.filter(function(x){return x!=='ras';}); p.indexOf(v)>-1 ? p=p.filter(function(x){return x!==v;}) : p.push(v); }
     e.pain = p;
@@ -2653,20 +1057,21 @@ function bindJournalEditor(day){
   if(sl) sl.addEventListener('change', async function(){ cur().sleep=sl.value.trim(); await persist(); });
   if(rh) rh.addEventListener('change', async function(){ cur().rhr=rh.value.trim(); await persist(); });
 }
-function allSessions(){ let t=0,d=0; WEEKS.forEach(function(w){ w.days.forEach(function(x){ if(x.t!=='off'){ t++; if(done[x.d]) d++; } }); }); return {t:t,d:d}; }
+function allSessions(){ let t=0,d=0; WEEKS.forEach(function(w){ arr(w && w.days).forEach(function(x){ if(x && x.t!=='off'){ t++; if(done[x.d]) d++; } }); }); return {t:t,d:d}; }
 function renderProgress(){ const s=allSessions(); const pct=s.t?Math.round(s.d/s.t*100):0; $("progbar").style.width=pct+"%"; $("proglbl").textContent=s.d+" / "+s.t+" séances · "+pct+"%"; }
 function renderToday(){
   const iso=todayISO(); const day=findDay(iso); const el=$("todaycard");
   if(!day){
-    let nxt=null; for(const w of WEEKS){ for(const dd of w.days){ if(dd.d>iso && dd.t!=='off'){ nxt=dd; break; } } if(nxt) break; }
+    let nxt=null; for(const w of WEEKS){ for(const dd of arr(w && w.days)){ if(dd && dd.d>iso && dd.t!=='off'){ nxt=dd; break; } } if(nxt) break; }
     el.innerHTML='<div class="today-card restday"><span class="tc-ico">🌙</span><div class="tc-main"><div class="tc-title">Hors plan</div><div class="tc-sub">'+(nxt?('Prochaine séance : '+frDate(nxt.d)):'Plan terminé — bravo !')+'</div></div></div>';
     return;
   }
   const isDone=!!done[day.d]; const lg=log[day.d];
   const ico=DAY_ICO[day.t]||'👟';
-  let sub=TYPE_LABEL[day.t]; if(day.km) sub+=' · ≈'+day.km+' km'; if(day.fc) sub+=' · FC '+day.fc;
-  if(isDone) sub='✓ Faite'+(lg&&lg.feel?' '+FEEL_EMO[lg.feel]:'');
-  el.innerHTML='<button type="button" class="today-card'+(isDone?' done':'')+(day.t==='off'?' restday':'')+'"><span class="tc-ico">'+ico+'</span><div class="tc-main"><div class="tc-title">'+day.title+'</div><div class="tc-sub">'+sub+'</div></div><span class="tc-go">›</span></button>';
+  let sub=esc(TYPE_LABEL[day.t]); if(day.km) sub+=' · ≈'+esc(day.km)+' km'; if(day.fc) sub+=' · FC '+esc(day.fc);
+  if(isDone) sub='✓ Faite'+(lg&&lg.feel?' '+esc(FEEL_EMO[lg.feel]):'');
+  if(unsavedDays[day.d]) sub+=' · ⚠ non enregistré';
+  el.innerHTML='<button type="button" class="today-card'+(isDone?' done':'')+(day.t==='off'?' restday':'')+'"><span class="tc-ico">'+ico+'</span><div class="tc-main"><div class="tc-title">'+esc(day.title)+'</div><div class="tc-sub">'+sub+'</div></div><span class="tc-go">›</span></button>';
   el.querySelector('.today-card').addEventListener('click', function(){ openSheet(day); });
 }
 function renderJournal(){
@@ -2675,12 +1080,12 @@ function renderJournal(){
   if(!entries.length){ list.innerHTML='<div class="empty">Aucune séance journalisée pour l\'instant.<br>Ouvre une séance et remplis « Mon ressenti » (sensation, allure/FC, gêne éventuelle).</div>'; return; }
   list.innerHTML=entries.map(function(k){
     const e=log[k]; const day=findDay(k);
-    const pains=(e.pain||[]).filter(function(p){return p!=='ras';});
+    const pains=arr(e.pain).filter(function(p){return p!=='ras';});
     const isPain=pains.length>0;
     let ptags=pains.map(function(p){return '<span class="pchip">⚠ '+PAIN_LABEL[p]+'</span>';}).join('');
-    if((e.pain||[]).indexOf('ras')>-1) ptags='<span class="pchip" style="background:var(--moss-soft);color:var(--moss)">RAS</span>';
+    if(arr(e.pain).indexOf('ras')>-1) ptags='<span class="pchip" style="background:var(--moss-soft);color:var(--moss)">RAS</span>';
     return '<div class="jentry'+(isPain?' pain':'')+'"><div class="je-top"><span class="je-date">'+frDate(k)+' '+k.slice(0,4)+'</span><span class="je-feel">'+(e.feel?FEEL_EMO[e.feel]:'')+'</span></div>'
-      +'<div class="je-title">'+(day?day.title:'Séance')+'</div>'
+      +'<div class="je-title">'+(day?esc(day.title):'Séance')+'</div>'
       +(e.metric?'<div class="je-metric">'+esc(e.metric)+'</div>':'')
       +((e.sleep||e.rhr)?'<div class="je-metric" style="color:var(--muted)">'+(e.sleep?'😴 '+esc(e.sleep)+' h':'')+(e.sleep&&e.rhr?'  ·  ':'')+(e.rhr?'❤️ '+esc(e.rhr)+' bpm repos':'')+'</div>':'')
       +(e.note?'<div class="je-note">'+esc(e.note)+'</div>':'')
@@ -2690,17 +1095,21 @@ function renderJournal(){
 }
 
 function renderRaces(){
-  const all = [...SEED_RACES, ...userRaces].sort((a,b)=>a.date.localeCompare(b.date));
+  const all = [...arr(SEED_RACES), ...arr(userRaces)]
+    .filter(r=>isPlainObject(r) && isISODate(r.date))
+    .sort((a,b)=>a.date.localeCompare(b.date));
   $("racelist").innerHTML = all.map(r=>{
     const dj = daysTo(r.date);
     const jj = dj>0 ? "J-"+dj : (dj===0 ? "JOUR J" : "passée");
-    return '<div class="race-card'+(r.target?" target":"")+'"><div class="rdate">'+frDate(r.date)+' '+r.date.slice(0,4)+'</div><h3>'+r.name+'</h3><div class="rchips">'+(r.dist&&r.dist!=="—"?'<span class="chip">'+r.dist+'</span>':"")+(r.dplus&&r.dplus!=="—"?'<span class="chip">'+r.dplus+' D+</span>':"")+'</div>'+(r.notes?'<div class="rnotes">'+r.notes+'</div>':"")+'<div class="jj">'+jj+'</div>'+(r.seed?"":'<button class="del" data-id="'+r.id+'">supprimer</button>')+'</div>';
+    return '<div class="race-card'+(r.target?" target":"")+'"><div class="rdate">'+esc(frDate(r.date))+' '+esc(r.date.slice(0,4))+'</div><h3>'+esc(r.name)+'</h3><div class="rchips">'+(r.dist&&r.dist!=="—"?'<span class="chip">'+esc(r.dist)+'</span>':"")+(r.dplus&&r.dplus!=="—"?'<span class="chip">'+esc(r.dplus)+' D+</span>':"")+'</div>'+(r.notes?'<div class="rnotes">'+esc(r.notes)+'</div>':"")+'<div class="jj">'+jj+'</div>'+(r.seed?"":'<button class="del" data-id="'+escAttr(r.id)+'">supprimer</button>')+'</div>';
   }).join("");
   $("racelist").querySelectorAll(".del").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       userRaces = userRaces.filter(r=>r.id!==btn.dataset.id);
-      await sset("tgcm-races", userRaces);
-      renderRaces(); toast("Course supprimée");
+      const ok = await saveUser("tgcm-races", userRaces);
+      renderRaces();
+      if(ok) toast("Course supprimée");
+      else toast(saveFailMsg("⚠ Suppression NON enregistrée — stockage plein.", "tgcm-races"), 7000);
     });
   });
 }
@@ -2712,11 +1121,125 @@ $("raceform").addEventListener("submit", async e=>{
     dist: $("rdist").value.trim() ? $("rdist").value.trim().replace(/km?$/i,"").trim()+" km" : "",
     dplus: $("rdplus").value.trim() ? $("rdplus").value.trim().replace(/m$/i,"").trim()+" m" : "",
     notes: $("rnotes").value.trim() });
-  await sset("tgcm-races", userRaces);
-  e.target.reset(); renderRaces(); toast("Course ajoutée 🏁");
+  const ok = await saveUser("tgcm-races", userRaces);
+  e.target.reset(); renderRaces();
+  if(ok) toast("Course ajoutée 🏁");
+  else toast(saveFailMsg("⚠ Course ajoutée mais NON enregistrée — stockage plein.", "tgcm-races"), 7000);
 });
 
-$("zonesbody").innerHTML = ZONES.map(z=>'<tr><td>'+z[0]+'</td><td><b>'+z[1]+'</b></td><td><b>'+z[2]+'</b></td></tr>').join("");
+/* ---- Onglet Zones : « Mettre à jour le plan » ---------------------------- */
+function planMsg(text, cls){
+  const el = $("planmsg");
+  el.className = "note plan-msg" + (cls ? " "+cls : "") + (text ? "" : " hidden");
+  el.textContent = text || "";
+}
+function hidePlanConfirm(){ pendingPlan = null; $("planconfirm").classList.add("hidden"); }
+
+$("planvalidate").addEventListener("click", function(){
+  hidePlanConfirm();
+  const raw = $("planbox").value.trim();
+  if(!raw){ toast("Colle d'abord un JSON de plan"); planMsg("Rien à valider : le champ est vide.", "err"); return; }
+  let obj;
+  try{ obj = JSON.parse(raw); }
+  catch(e){
+    toast("JSON illisible ✗");
+    planMsg("JSON illisible (fichier tronqué, texte collé incomplet ou fichier non-JSON).\nDétail : "+e.message, "err");
+    return;
+  }
+  const v = safeValid(obj);
+  if(!v.ok){
+    toast("Plan refusé ✗");
+    planMsg("Plan refusé — "+v.errors.length+" erreur"+(v.errors.length>1?"s":"")+" :\n"+formatErrors(v.errors), "err");
+    return;
+  }
+  pendingPlan = obj;
+  const s = v.summary;
+  planMsg("Plan valide.", "ok");
+  $("plansummary").textContent = "v"+s.version+" · "+s.weeks+" semaines · "+s.days+" jours · du "
+    + frNum(s.start)+" au "+frNum(s.end)+" — appliquer ?";
+  $("planconfirm").classList.remove("hidden");
+});
+
+$("plancancel").addEventListener("click", function(){
+  hidePlanConfirm();
+  planMsg("Application annulée. Le plan actif n'a pas changé.", "");
+});
+
+$("planapply").addEventListener("click", async function(){
+  if(!pendingPlan) return;
+  const v = safeValid(pendingPlan);
+  if(!v.ok){ toast("Plan refusé ✗"); planMsg("Plan refusé :\n"+formatErrors(v.errors), "err"); hidePlanConfirm(); return; }
+  const p = pendingPlan;
+  hidePlanConfirm();
+  // B8 : ne jamais annoncer un succes si rien n'a ete persiste.
+  const saved = await sset("plan-override", p);
+  applyPlan(p, "override");
+  PLAN_PENDING_OVERRIDE = null;
+  $("planbox").value = "";
+  renderAll();
+  if(saved){
+    planMsg("Plan v"+p.version+" appliqué. Tes coches et ton journal sont intacts.", "ok");
+    toast("Plan mis à jour ✓");
+  } else {
+    planMsg("Plan v"+p.version+" appliqué MAIS NON ENREGISTRÉ : espace de stockage insuffisant.\n"
+      + "Il disparaîtra au prochain lancement de l'app. Libère de l'espace (Réglages › Safari › Données de sites), "
+      + "puis réapplique le plan.", "err");
+    toast("⚠ Plan appliqué mais NON enregistré — stockage plein. Libère de l'espace, sors de la navigation privée, et exporte tes données.", 7000);
+  }
+});
+
+$("planreset").addEventListener("click", async function(){
+  if(!confirm("Revenir au plan par défaut ?\n\nUne connexion est nécessaire pour retélécharger plan.json : "
+    + "si elle échoue, ton plan importé est conservé.\n\nTes coches, ton journal et tes courses ne sont pas touchés.")) return;
+  hidePlanConfirm();
+  // B4 : on recharge d'ABORD, on ne supprime l'override QUE si plan.json est joignable.
+  let def = null, why = "";
+  try{ def = await fetchPlanJSON(); }
+  catch(e){
+    why = isTimeoutErr(e)
+      ? "plan.json n'a pas répondu en "+(PLAN_FETCH_TIMEOUT/1000)+" s"
+      : ((e && e.message) ? e.message : "réseau indisponible");
+  }
+  if(def && !safeValid(def).ok){ def = null; why = "plan.json trouvé mais invalide"; }
+  if(!def){
+    planMsg("Retour au plan par défaut impossible : "+why+".\n"
+      + "Ton plan importé est CONSERVÉ et reste actif — l'app continue de fonctionner. Réessaie une fois connecté.", "err");
+    toast("plan.json indisponible — plan importé conservé");
+    return;
+  }
+  await sdel("plan-override");
+  try{ await sset("plan-cache", def); }catch(e){}
+  applyPlan(def, "default");
+  PLAN_PENDING_OVERRIDE = null;
+  renderAll();
+  planMsg("Plan par défaut rétabli (v"+def.version+").", "ok");
+  toast("Plan par défaut rétabli ✓");
+});
+
+$("planfile").addEventListener("change", function(){
+  const f = $("planfile").files && $("planfile").files[0];
+  if(!f) return;
+  const fr = new FileReader();
+  fr.onload = function(){
+    $("planbox").value = String(fr.result || "");
+    $("planfile").value = "";
+    $("planvalidate").click();
+  };
+  fr.onerror = function(){
+    $("planfile").value = "";
+    toast("Lecture impossible ✗");
+    planMsg("Impossible de lire ce fichier.", "err");
+  };
+  try{ fr.readAsText(f); }
+  catch(e){ toast("Lecture impossible ✗"); planMsg("Impossible de lire ce fichier : "+e.message, "err"); }
+});
+
+/* Conseil actionnable : l'export n'ecrit PAS dans localStorage (fichier +
+   presse-papier), il reste donc possible meme stockage plein. */
+$("savealert-export").addEventListener("click", function(){
+  $("tab-journal").click();
+  $("btnexport").click();
+});
 
 const pages = {plan:$("page-plan"), races:$("page-races"), journal:$("page-journal"), zones:$("page-zones")};
 ["plan","races","journal","zones"].forEach(t=>{
@@ -2729,38 +1252,123 @@ const pages = {plan:$("page-plan"), races:$("page-races"), journal:$("page-journ
 });
 
 $("btnexport").addEventListener("click", function(){
-  const data={done:done, log:log, races:userRaces, v:7, exported:new Date().toISOString()};
+  // Un export ne doit JAMAIS pouvoir passer pour complet s'il ne l'est pas :
+  // avertissement avant production, marquage dans le fichier, nom de fichier
+  // explicite, et prise en compte au moment de le reimporter.
+  const missing = USER_KEYS.filter(function(k){ return !!readFailed[k]; });
+  if(missing.length){
+    const manque = missing.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ");
+    if(!confirm("⚠ SAUVEGARDE INCOMPLÈTE\n\nImpossible de lire sur cet appareil : "+manque+".\n\n"
+      + "Le fichier sera produit SANS ces données (il sera marqué « incomplet »), alors qu'elles existent peut-être toujours ici.\n\n"
+      + "N'écrase surtout pas une sauvegarde plus ancienne avec ce fichier.\n\nProduire quand même cet export partiel ?")){
+      toast("Export annulé — rien n'a été produit", 5000);
+      return;
+    }
+  }
+  const data={done:done, log:log, races:userRaces, v:8, exported:new Date().toISOString()};
+  if(missing.length){ data.partial=true; data.unreadable=missing; }
+  if(PLAN){ data.plan=PLAN; data.planSource=PLAN_SOURCE; }
   const str=JSON.stringify(data);
   $("iobox").value=str;
-  if(navigator.clipboard){ navigator.clipboard.writeText(str).then(function(){toast("Export copié 📋");}).catch(function(){toast("Export prêt — copie le texte");}); }
-  else { toast("Export prêt — copie le texte"); }
-  try{ const blob=new Blob([str],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="suquet-sauvegarde.json"; a.click(); setTimeout(function(){URL.revokeObjectURL(url);},1000); }catch(e){}
+  const okMsg = missing.length ? "⚠ Export INCOMPLET produit — il manque : " + brokenKeysLabel() + "." : null;
+  const dur = missing.length ? 7000 : 1800;
+  if(navigator.clipboard){ navigator.clipboard.writeText(str).then(function(){toast(okMsg||"Export copié 📋", dur);}).catch(function(){toast(okMsg||"Export prêt — copie le texte", dur);}); }
+  else { toast(okMsg||"Export prêt — copie le texte", dur); }
+  const nom = missing.length ? "suquet-sauvegarde-INCOMPLETE.json" : "suquet-sauvegarde.json";
+  try{ const blob=new Blob([str],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=nom; a.click(); setTimeout(function(){URL.revokeObjectURL(url);},1000); }catch(e){}
 });
 $("btnimport").addEventListener("click", async function(){
   const raw=$("iobox").value.trim(); if(!raw){ toast("Colle d'abord un export"); return; }
   let data; try{ data=JSON.parse(raw); }catch(e){ toast("Format invalide ✗"); return; }
-  if(data.done) done=data.done; if(data.log) log=data.log; if(data.races) userRaces=data.races;
-  await sset("tgcm-done", done); await sset("tgcm-log", log); await sset("tgcm-races", userRaces);
-  renderWeek(); renderRaces(); renderJournal(); renderToday(); renderProgress();
-  toast("Données importées ✓");
+  // B14 : une racine qui n'est pas un objet exploitable ne doit pas annoncer un succes.
+  if(!isPlainObject(data)){ toast("Sauvegarde invalide : objet attendu ✗"); return; }
+  // Un export marque INCOMPLET porte des valeurs vides pour les cles qu'il n'a
+  // pas pu lire : on les traite comme ABSENTES, jamais comme des donnees a
+  // restaurer, sinon le fichier detruirait ce qui est encore intact ici.
+  const unread = Array.isArray(data.unreadable)
+    ? data.unreadable.filter(function(k){ return USER_KEYS.indexOf(k) > -1; })
+    : [];
+  const hasDone  = isPlainObject(data.done)  && unread.indexOf("tgcm-done")  < 0;
+  const hasLog   = isPlainObject(data.log)   && unread.indexOf("tgcm-log")   < 0;
+  const hasRaces = Array.isArray(data.races) && unread.indexOf("tgcm-races") < 0;
+  if(!hasDone && !hasLog && !hasRaces && !isPlainObject(data.plan)){
+    toast(unread.length
+      ? "Sauvegarde incomplète : elle ne contient aucune donnée exploitable ✗"
+      : "Sauvegarde invalide : ni coches, ni journal, ni courses, ni plan ✗", 5000);
+    return;
+  }
+  if(unread.length){
+    const manque = unread.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ");
+    if(!confirm("⚠ Cette sauvegarde est marquée INCOMPLÈTE.\n\nElle ne contient pas : "+manque+".\n\n"
+      + "Ces données ne seront PAS restaurées ; ce que tu as actuellement sur cet appareil est conservé tel quel.\n\nContinuer ?")){
+      toast("Import annulé", 4000); return;
+    }
+  }
+  if(hasDone) done=data.done;
+  if(hasLog) log=data.log;
+  if(hasRaces) userRaces=data.races;
+  let okSave = true;
+  // Restauration EXPLICITE : seul cas ou l'on accepte d'ecrire par-dessus une
+  // cle illisible. On ne force QUE les cles REELLEMENT fournies par la
+  // sauvegarde : une cle absente (ou marquee illisible a l'export) ne doit
+  // jamais etre ecrasee par la valeur vide qu'on a en memoire.
+  if(hasDone  && !(await saveUser("tgcm-done", done, null, true))) okSave = false;
+  if(hasLog   && !(await saveUser("tgcm-log", log, null, true))) okSave = false;
+  if(hasRaces && !(await saveUser("tgcm-races", userRaces, null, true))) okSave = false;
+  // Sauvegardes anciennes (sans champ `plan`) : toujours supportées, on ne touche pas au plan actif.
+  let planNote = "";
+  if(data.plan!==undefined && data.plan!==null){
+    let v;
+    try{ v = safeValid(data.plan); }
+    catch(e){ v = {ok:false, errors:[String(e)]}; }
+    if(!v.ok){
+      planNote = " (plan de la sauvegarde ignoré : invalide)";
+    } else if(data.planSource === "default"){
+      // B7 : la sauvegarde portait le plan par defaut -> ne pas creer d'override.
+      planNote = " (plan par défaut de la sauvegarde : pas d'override créé)";
+    } else {
+      if(!(await sset("plan-override", data.plan))) okSave = false;
+      applyPlan(data.plan, "override");
+      PLAN_PENDING_OVERRIDE = null;
+      planNote = " + plan v"+data.plan.version;
+    }
+  }
+  renderAll();
+  // Un export partiel ne doit pas non plus passer pour complet A LA REIMPORTATION.
+  const absent = unread.length
+    ? " — sauvegarde incomplète, non restauré : "+unread.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ")
+    : "";
+  const reste = READ_BROKEN ? " — ⚠ toujours illisible ici : "+brokenKeysLabel() : "";
+  if(okSave) toast("Données importées ✓"+planNote+absent+reste, (absent||reste) ? 7000 : 1800);
+  else toast("Import appliqué mais NON enregistré — stockage plein"+planNote, 7000);
 });
 
 let toastT;
-function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),1800); }
+/* ms optionnel : les appels existants gardent exactement 1800 ms. */
+function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"), ms||1800); }
 
 (async function init(){
-  const dj = daysTo(RACE_DAY);
-  $("jj").textContent = dj>0 ? "J-"+dj : (dj===0 ? "JOUR J" : "Finie !");
-  done = await sget("tgcm-done", {});
-  userRaces = await sget("tgcm-races", []);
-  log = await sget("tgcm-log", {});
-  const t = todayISO();
-  let idx = WEEKS.findIndex(w => t >= w.days[0].d && t <= w.days[6].d);
-  if(idx === -1) idx = t < WEEKS[0].days[0].d ? 0 : WEEKS.length-1;
-  curWk = idx;
-  renderWeek(); renderRaces(); renderToday(); renderProgress(); renderJournal();
-  $("prevwk").addEventListener("click", ()=>{ if(curWk>0){curWk--; renderWeek();} });
-  $("nextwk").addEventListener("click", ()=>{ if(curWk<WEEKS.length-1){curWk++; renderWeek();} });
+  try{
+    $("prevwk").addEventListener("click", ()=>{ if(curWk>0){curWk--; renderWeek();} });
+    $("nextwk").addEventListener("click", ()=>{ if(curWk<WEEKS.length-1){curWk++; renderWeek();} });
+    const d0 = await sget("tgcm-done", {});   done     = isPlainObject(d0) ? d0 : {};
+    const r0 = await sget("tgcm-races", []);  userRaces = Array.isArray(r0) ? r0 : [];
+    const l0 = await sget("tgcm-log", {});    log      = isPlainObject(l0) ? l0 : {};
+    // Valeur lisible mais de forme inattendue : on ne sait pas non plus la
+    // reprendre, donc on la protege comme une lecture en echec.
+    if(!isPlainObject(d0)) readFailed["tgcm-done"]  = true;
+    if(!Array.isArray(r0)) readFailed["tgcm-races"] = true;
+    if(!isPlainObject(l0)) readFailed["tgcm-log"]   = true;
+    noteReadFailures();
+    // Sonde d'ecriture sur une cle JETABLE (`tgcm-probe`) : previent Enzo si le
+    // stockage est plein / en navigation privee AVANT toute perte, sans jamais
+    // toucher a tgcm-done / tgcm-log / tgcm-races.
+    if(!READ_BROKEN) await storageProbe();
+    await reloadPlan(false);
+  }catch(e){
+    // Filet de derniere instance : jamais d'ecran fige sur « Chargement du plan… ».
+    try{ failToPlanError((e && e.message) || String(e)); }catch(_){}
+  }
 })();
 
 if('serviceWorker' in navigator){ window.addEventListener('load', function(){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }); }
