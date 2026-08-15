@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# Documents personnels : ils restent sur le disque (Claude Code en a besoin)
+# mais ne doivent PAS entrer dans le depot.
+#
+# Contexte : CLAUDE.md et le cahier des charges contiennent des donnees de
+# sante, un prenom, un age et une ville. Ils ont ete commites par erreur le
+# 14/08/2026 et servis publiquement par Netlify jusqu'au 15/08/2026.
+# ---------------------------------------------------------------------------
+
+# Tout markdown a la racine est considere comme un document de travail perso.
+# Pour en versionner un volontairement (un README par exemple) : git add -f
+/*.md
+
+# Configuration et agents Claude Code
+/.claude/
+
+# ---------------------------------------------------------------------------
+# Secrets : ne doivent JAMAIS approcher le depot.
+# Les valeurs vivent uniquement dans les variables d'environnement Netlify.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Dependances et artefacts d'outillage
+# ---------------------------------------------------------------------------
+node_modules/
+.netlify/
+# package-lock.json est VOLONTAIREMENT versionne : sans lui, Netlify re-resout
+# les versions a chaque build et pourrait installer autre chose que ce qui a
+# ete valide.
+
+# Sauvegardes exportees depuis l'app (elles contiennent le journal de sante)
+suquet-sauvegarde*.json
+
+# Systeme
+.DS_Store
+Thumbs.db

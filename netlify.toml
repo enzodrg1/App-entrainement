@@ -1,0 +1,19 @@
+# Seul le contenu de public/ est publie. Tout le reste du depot -- documents
+# personnels, sources des fonctions, package.json -- est impubliable PAR
+# CONSTRUCTION : rien a maintenir, rien a penser a exclure.
+# Aucune etape de build, index.html reste du vanilla, servi tel quel.
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Les reponses des fonctions ne doivent jamais etre mises en cache
+# (ni par le navigateur, ni par le CDN, ni par le service worker).
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
