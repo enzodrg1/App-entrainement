@@ -96,6 +96,19 @@ h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size
 .btn{flex:1; padding:12px; border-radius:12px; font-weight:600; font-size:15px; text-align:center}
 .btn.primary{background:var(--orange); color:#1A0E06}
 .btn.ghost{background:var(--panel); border:1px solid var(--line)}
+/* Bouton d'action destructrice : ambre (meme code visuel que les alertes),
+   volontairement distinct de l'orange d'action courante. */
+.btn.danger{background:rgba(224,168,62,.18); border:1px solid var(--amber); color:var(--amber)}
+/* Modale de confirmation maison : reprend .overlay/.sheet, au-dessus de la
+   fiche de seance (50), du bandeau (35) et du toast (60). */
+.overlay.ask{z-index:70}
+.sheet.ask{z-index:80; max-height:86vh}
+.sheet.ask .sbody{padding:10px 18px 4px}
+.sheet.ask .actions{padding:10px 18px calc(14px + env(safe-area-inset-bottom))}
+.sheet.ask .shead h2{font-size:21px; margin-bottom:2px}
+#askbody p{margin:0 0 10px; font-size:14.5px; line-height:1.5; color:var(--ink)}
+#askbody p:last-child{margin-bottom:0}
+#askbody p.lead{color:var(--amber); font-weight:600}
 nav.tabs{position:fixed; bottom:0; left:0; right:0; display:flex; background:rgba(14,27,22,.94); backdrop-filter:blur(8px); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:30}
 nav.tabs button{flex:1; padding:12px 0 10px; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--dim); font-family:var(--disp); text-transform:uppercase; letter-spacing:.08em; font-size:12.5px; font-weight:600}
 nav.tabs button.active{color:var(--orange)}
@@ -337,6 +350,20 @@ input[type=file].io{display:block; width:100%; background:var(--bg); border:1px 
   <div class="actions">
     <button class="btn ghost" id="closesheet">Fermer</button>
     <button class="btn primary" id="togdone">Marquer faite ✓</button>
+  </div>
+</div>
+
+<!-- Modale de confirmation maison : remplace confirm(), que Safari peut
+     neutraliser en PWA. Un avertissement de perte de donnees ne doit jamais
+     pouvoir disparaitre en silence. -->
+<div class="overlay ask" id="askoverlay"></div>
+<div class="sheet ask" id="ask" role="dialog" aria-modal="true" aria-labelledby="asktitle" aria-describedby="askbody" aria-hidden="true">
+  <div class="grab"></div>
+  <div class="shead"><h2 id="asktitle"></h2></div>
+  <div class="sbody" id="askbody"></div>
+  <div class="actions">
+    <button class="btn ghost" id="askcancel" type="button">Annuler</button>
+    <button class="btn primary" id="askok" type="button">Confirmer</button>
   </div>
 </div>
 
@@ -1127,6 +1154,98 @@ $("raceform").addEventListener("submit", async e=>{
   else toast(saveFailMsg("⚠ Course ajoutée mais NON enregistrée — stockage plein.", "tgcm-races"), 7000);
 });
 
+/* ======================================================================
+   MODALE DE CONFIRMATION — remplace confirm()
+   Safari peut neutraliser confirm() en PWA : un avertissement de perte de
+   donnees passerait alors a la trappe en silence.
+
+   REGLE ABSOLUE (comportement d'echec sur) : SEUL un clic franc sur le bouton
+   de confirmation resout `true`. TOUTE autre issue resout `false` et annule
+   l'action : bouton Annuler, clic sur l'overlay, touche Echap, navigation
+   arriere, exception pendant l'affichage, elements de la modale absents,
+   liaisons d'evenements impossibles. En cas de doute -> annulation.
+   ====================================================================== */
+let ASK_READY = false;      // les boutons ont-ils pu etre cables ?
+let askSettle = null;       // resolveur de la modale en cours
+let askPrevFocus = null;    // element a re-focaliser a la fermeture
+
+function askClose(result){
+  const settle = askSettle;
+  askSettle = null;
+  try{
+    $("askoverlay").classList.remove("open");
+    $("ask").classList.remove("open");
+    $("ask").setAttribute("aria-hidden", "true");
+  }catch(e){}
+  try{ document.removeEventListener("keydown", askKeydown, true); }catch(e){}
+  try{ window.removeEventListener("popstate", askPopstate); }catch(e){}
+  try{ if(askPrevFocus && askPrevFocus.focus) askPrevFocus.focus(); }catch(e){}
+  askPrevFocus = null;
+  // Tout ce qui n'est pas exactement `true` vaut annulation.
+  if(settle) settle(result === true);
+}
+function askKeydown(e){
+  if(!askSettle) return;
+  if(e.key === "Escape" || e.key === "Esc"){ e.preventDefault(); e.stopPropagation(); askClose(false); return; }
+  if(e.key === "Tab"){
+    // Piege a focus : la tabulation ne sort jamais des deux boutons.
+    const f = [$("askcancel"), $("askok")];
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault();
+    const n = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i < 0 || i === f.length - 1 ? 0 : i + 1);
+    try{ f[n].focus(); }catch(_){}
+  }
+}
+function askPopstate(){ if(askSettle) askClose(false); }
+
+/* Renvoie une promesse resolue a true/false. Ne rejette JAMAIS : un rejet
+   non rattrape chez l'appelant pourrait laisser filer l'action. */
+function askConfirm(opt){
+  return new Promise(function(resolve){
+    let done = false;
+    const settle = function(v){ if(done) return; done = true; resolve(v === true); };
+    try{
+      if(!ASK_READY){ settle(false); return; }              // cablage impossible -> annulation
+      if(askSettle) askClose(false);                        // jamais deux modales empilees
+      const ov = $("askoverlay"), box = $("ask"), ttl = $("asktitle"),
+            body = $("askbody"), ok = $("askok"), no = $("askcancel");
+      if(!ov || !box || !ttl || !body || !ok || !no){ settle(false); return; } // affichage impossible -> annulation
+      ttl.textContent = (opt && opt.title) || "Confirmer";
+      body.innerHTML = "";
+      const lines = (opt && Array.isArray(opt.lines)) ? opt.lines : [];
+      lines.forEach(function(l, i){
+        const p = document.createElement("p");
+        if(i === 0 && opt && opt.danger) p.className = "lead";
+        p.textContent = String(l);
+        body.appendChild(p);
+      });
+      ok.textContent = (opt && opt.okLabel) || "Confirmer";
+      no.textContent = (opt && opt.cancelLabel) || "Annuler";
+      ok.className = "btn " + ((opt && opt.danger) ? "danger" : "primary");
+      askSettle = settle;
+      askPrevFocus = document.activeElement;
+      box.setAttribute("aria-hidden", "false");
+      ov.classList.add("open");
+      box.classList.add("open");
+      document.addEventListener("keydown", askKeydown, true);
+      window.addEventListener("popstate", askPopstate);
+      // Focus initial sur ANNULER : le bouton destructeur n'est jamais celui
+      // qu'on active par reflexe (Entree, double-tap).
+      try{ no.focus(); }catch(_){}
+    }catch(e){
+      // Exception pendant l'affichage -> annulation, jamais execution.
+      try{ askClose(false); }catch(_){}
+      settle(false);
+    }
+  });
+}
+try{
+  $("askok").addEventListener("click", function(){ askClose(true); });
+  $("askcancel").addEventListener("click", function(){ askClose(false); });
+  $("askoverlay").addEventListener("click", function(){ askClose(false); });
+  ASK_READY = true;
+}catch(e){ ASK_READY = false; }
+
 /* ---- Onglet Zones : « Mettre à jour le plan » ---------------------------- */
 function planMsg(text, cls){
   const el = $("planmsg");
@@ -1189,8 +1308,18 @@ $("planapply").addEventListener("click", async function(){
 });
 
 $("planreset").addEventListener("click", async function(){
-  if(!confirm("Revenir au plan par défaut ?\n\nUne connexion est nécessaire pour retélécharger plan.json : "
-    + "si elle échoue, ton plan importé est conservé.\n\nTes coches, ton journal et tes courses ne sont pas touchés.")) return;
+  const go = await askConfirm({
+    title: "Revenir au plan par défaut ?",
+    lines: [
+      "Ton plan importé sera supprimé de cet appareil et remplacé par plan.json.",
+      "Une connexion est nécessaire pour le retélécharger : si elle échoue, ton plan importé est conservé.",
+      "Tes coches, ton journal et tes courses ne sont pas touchés."
+    ],
+    okLabel: "Revenir au plan par défaut",
+    cancelLabel: "Annuler",
+    danger: true
+  });
+  if(!go) return;
   hidePlanConfirm();
   // B4 : on recharge d'ABORD, on ne supprime l'override QUE si plan.json est joignable.
   let def = null, why = "";
@@ -1251,16 +1380,27 @@ const pages = {plan:$("page-plan"), races:$("page-races"), journal:$("page-journ
   });
 });
 
-$("btnexport").addEventListener("click", function(){
+$("btnexport").addEventListener("click", async function(){
   // Un export ne doit JAMAIS pouvoir passer pour complet s'il ne l'est pas :
   // avertissement avant production, marquage dans le fichier, nom de fichier
   // explicite, et prise en compte au moment de le reimporter.
+  // NB : en cas nominal (missing vide) aucun `await` n'est franchi, le
+  // telechargement reste dans le meme tour de boucle que le clic.
   const missing = USER_KEYS.filter(function(k){ return !!readFailed[k]; });
   if(missing.length){
     const manque = missing.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ");
-    if(!confirm("⚠ SAUVEGARDE INCOMPLÈTE\n\nImpossible de lire sur cet appareil : "+manque+".\n\n"
-      + "Le fichier sera produit SANS ces données (il sera marqué « incomplet »), alors qu'elles existent peut-être toujours ici.\n\n"
-      + "N'écrase surtout pas une sauvegarde plus ancienne avec ce fichier.\n\nProduire quand même cet export partiel ?")){
+    const go = await askConfirm({
+      title: "⚠ Sauvegarde incomplète",
+      lines: [
+        "Impossible de lire sur cet appareil : " + manque + ".",
+        "Le fichier sera produit SANS ces données et marqué « incomplet », alors qu'elles existent peut-être toujours ici.",
+        "N'écrase surtout pas une sauvegarde plus ancienne avec ce fichier."
+      ],
+      okLabel: "Exporter quand même",
+      cancelLabel: "Annuler",
+      danger: true
+    });
+    if(!go){
       toast("Export annulé — rien n'a été produit", 5000);
       return;
     }
@@ -1299,10 +1439,18 @@ $("btnimport").addEventListener("click", async function(){
   }
   if(unread.length){
     const manque = unread.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ");
-    if(!confirm("⚠ Cette sauvegarde est marquée INCOMPLÈTE.\n\nElle ne contient pas : "+manque+".\n\n"
-      + "Ces données ne seront PAS restaurées ; ce que tu as actuellement sur cet appareil est conservé tel quel.\n\nContinuer ?")){
-      toast("Import annulé", 4000); return;
-    }
+    const go = await askConfirm({
+      title: "⚠ Sauvegarde incomplète",
+      lines: [
+        "Ce fichier est marqué « incomplet ». Il ne contient pas : " + manque + ".",
+        "Ces données ne seront PAS restaurées : ce que tu as actuellement sur cet appareil est conservé tel quel.",
+        "Le reste de la sauvegarde sera importé normalement."
+      ],
+      okLabel: "Importer quand même",
+      cancelLabel: "Annuler",
+      danger: true
+    });
+    if(!go){ toast("Import annulé", 4000); return; }
   }
   if(hasDone) done=data.done;
   if(hasLog) log=data.log;
