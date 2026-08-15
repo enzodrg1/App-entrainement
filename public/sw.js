@@ -1,4 +1,4 @@
-const C = 'coaching-trail-v11';
+const C = 'coaching-trail-v12';
 const ASSETS = ['./','./index.html','./plan.json','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-512-maskable.png','./apple-touch-icon.png'];
 
 // addAll() rejette EN BLOC : un seul asset manquant (404 sur plan.json par ex.)
@@ -29,6 +29,15 @@ self.addEventListener('activate', function(e){
 self.addEventListener('fetch', function(e){
   var req = e.request;
   if(req.method!=='GET') return;
+  // Les fonctions serverless ne doivent JAMAIS etre interceptees : ni mises en
+  // cache, ni servies depuis le cache, ni utilisees comme reponse de repli.
+  // On sort AVANT toute autre branche : sans respondWith, le navigateur fait
+  // sa requete reseau normale.
+  try{
+    var fnUrl = new URL(req.url);
+    if(fnUrl.pathname.indexOf('/.netlify/functions/') === 0) return;
+  }catch(_){}
+
   var accept = req.headers.get('accept') || '';
   var isHTML = req.mode==='navigate' || accept.indexOf('text/html')>-1;
 

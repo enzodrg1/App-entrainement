@@ -7,10 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Adonis">
+<meta name="apple-mobile-web-app-title" content="Entraînement">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Adonis Trail · Plan</title>
+<title>Entraînement · Plan</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -192,6 +192,8 @@ body.hasalert header{padding-top:14px}
 textarea.io{width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px; color:var(--ink); font-size:16px; font-family:monospace; min-height:70px; margin-top:8px}
 /* mise a jour du plan */
 input[type=file].io{display:block; width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:9px 10px; color:var(--muted); font-size:16px; font-family:var(--body); margin-top:8px}
+input[type=password].io, input[type=text].io{display:block; width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; color:var(--ink); font-size:16px; font-family:var(--body); margin-top:8px}
+input.io::placeholder{color:var(--dim)}
 .plan-msg{white-space:pre-wrap; word-break:break-word}
 .plan-msg.err{color:var(--amber)}
 .plan-msg.ok{color:var(--moss)}
@@ -325,6 +327,17 @@ input[type=file].io{display:block; width:100%; background:var(--bg); border:1px 
       <div class="frow"><button class="btn ghost" id="plancancel" type="button">Annuler</button><button class="btn primary" id="planapply" type="button">Appliquer</button></div>
     </div>
     <p class="note">Tes coches, ton journal et tes courses ne sont jamais touchés par un changement de plan (ils sont indexés par date).</p>
+  </div>
+
+  <div class="card">
+    <h3>🔗 Strava</h3>
+    <p class="note" id="stravainfo" style="margin-top:0">État non vérifié.</p>
+    <input class="io" type="password" id="stravakey" placeholder="Clé d'appareil" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Clé d'appareil">
+    <div class="frow" style="margin-top:8px"><button class="btn ghost" id="stravasave" type="button">Enregistrer la clé</button><button class="btn ghost" id="stravacheck" type="button">Vérifier</button></div>
+    <div class="frow"><button class="btn ghost" id="stravaconnect" type="button">Connecter Strava</button><button class="btn ghost" id="stravalogout" type="button">Déconnecter</button></div>
+    <div class="note plan-msg hidden" id="stravamsg"></div>
+    <p class="note">Ce site est public : la <b>clé d'appareil</b> est ce qui empêche un inconnu de lire tes sorties ou de détourner la connexion. Génère-la toi-même, déclare-la dans les variables Netlify sous <b>APP_ACCESS_KEY</b>, puis saisis-la ici une fois. Elle reste sur cet appareil et <b>n'est jamais incluse dans l'export de sauvegarde</b>.</p>
+    <p class="note">La synchronisation est un bonus : l'app fonctionne exactement pareil sans Strava, y compris hors-ligne.</p>
   </div>
 </section>
 
@@ -1370,12 +1383,171 @@ $("savealert-export").addEventListener("click", function(){
   $("btnexport").click();
 });
 
+/* ======================================================================
+   STRAVA — etape A : connexion OAuth uniquement.
+   Aucune activite n'est encore affichee.
+
+   INVARIANT 4 : la synchro est un BONUS. Rien ici ne doit pouvoir bloquer
+   le demarrage, retarder l'affichage du plan, ni lever une exception non
+   rattrapee. Aucun appel reseau au demarrage : l'etat n'est interroge qu'a
+   l'ouverture de l'onglet Zones ou sur action explicite d'Enzo.
+   La cle d'appareil vit sous `strava-key` et n'entre JAMAIS dans l'export.
+   ====================================================================== */
+const STRAVA_FN = "./.netlify/functions/";
+const STRAVA_TIMEOUT = 8000;
+let STRAVA_KEY = "";
+let STRAVA_STATE = "unknown";   // unknown | nokey | badkey | off | on | down | checking
+let STRAVA_SINCE = "";
+let stravaProbed = false;       // l'etat a-t-il deja ete interroge dans cette session ?
+
+function stravaMsg(text, cls){
+  const el = $("stravamsg"); if(!el) return;
+  el.className = "note plan-msg" + (cls ? " " + cls : "") + (text ? "" : " hidden");
+  el.textContent = text || "";
+}
+async function stravaGetKey(){
+  if(STRAVA_KEY) return STRAVA_KEY;
+  try{ const k = await sget("strava-key", ""); STRAVA_KEY = (typeof k === "string") ? k : ""; }
+  catch(e){ STRAVA_KEY = ""; }
+  return STRAVA_KEY;
+}
+/* Appel reseau tolerant a l'echec : ne leve jamais, delai borne. */
+async function stravaCall(path, method){
+  const key = await stravaGetKey();
+  if(!key) return {ok:false, status:0, reason:"nokey", body:null};
+  let ctl = null, timer = null;
+  try{
+    let opts = {method: method || "GET", cache:"no-store", headers:{"x-app-key": key}};
+    if(typeof AbortController !== "undefined"){ ctl = new AbortController(); opts.signal = ctl.signal; }
+    const guard = new Promise(function(_, reject){
+      timer = setTimeout(function(){
+        if(ctl){ try{ ctl.abort(); }catch(e){} }
+        reject(new Error("timeout"));
+      }, STRAVA_TIMEOUT);
+    });
+    const work = (async function(){
+      const res = await fetch(STRAVA_FN + path, opts);
+      let body = null;
+      try{ body = await res.json(); }catch(e){ body = null; }
+      return {ok: !!res.ok, status: res.status, reason:"", body: body};
+    })();
+    return await Promise.race([work, guard]);
+  }catch(e){
+    return {ok:false, status:0, reason:"network", body:null};
+  }finally{
+    if(timer) clearTimeout(timer);
+  }
+}
+function renderStravaCard(){
+  const el = $("stravainfo"); if(!el) return;
+  let t;
+  switch(STRAVA_STATE){
+    case "nokey":    t = "Non configuré — saisis ta clé d'appareil ci-dessous."; break;
+    case "badkey":   t = "Clé d'appareil refusée par le serveur. Vérifie qu'elle correspond à APP_ACCESS_KEY."; break;
+    case "checking": t = "Vérification en cours…"; break;
+    case "on":       t = "Connecté à Strava" + (STRAVA_SINCE ? " depuis le " + frNum(String(STRAVA_SINCE).slice(0,10)) : "") + "."; break;
+    case "off":      t = "Clé reconnue — pas encore connecté à Strava."; break;
+    case "down":     t = "Service indisponible (hors-ligne ou fonctions injoignables). L'app fonctionne normalement sans."; break;
+    default:         t = "État non vérifié — ouvre cet onglet ou tape « Vérifier ».";
+  }
+  el.textContent = t;
+}
+async function stravaRefresh(){
+  try{
+    const key = await stravaGetKey();
+    if(!key){ STRAVA_STATE = "nokey"; renderStravaCard(); return; }
+    STRAVA_STATE = "checking"; renderStravaCard();
+    const r = await stravaCall("auth-status", "GET");
+    if(r.ok && r.body && typeof r.body.connected === "boolean"){
+      STRAVA_STATE = r.body.connected ? "on" : "off";
+      STRAVA_SINCE = (r.body.since && typeof r.body.since === "string") ? r.body.since : "";
+    } else if(r.status === 401){
+      STRAVA_STATE = "badkey";
+    } else {
+      STRAVA_STATE = "down";
+    }
+    renderStravaCard();
+  }catch(e){
+    // Aucune remontee d'exception : au pire l'etat reste « indisponible ».
+    STRAVA_STATE = "down";
+    try{ renderStravaCard(); }catch(_){}
+  }
+}
+
+try{
+  $("stravasave").addEventListener("click", async function(){
+    const v = ($("stravakey").value || "").trim();
+    if(!v){ stravaMsg("Saisis d'abord ta clé d'appareil.", "err"); return; }
+    STRAVA_KEY = v;
+    const okSave = await sset("strava-key", v);
+    $("stravakey").value = "";
+    if(okSave) stravaMsg("Clé enregistrée sur cet appareil.", "ok");
+    else stravaMsg("Clé prise en compte pour cette session, mais NON enregistrée (stockage plein).", "err");
+    stravaProbed = true;
+    await stravaRefresh();
+  });
+
+  $("stravacheck").addEventListener("click", async function(){
+    stravaMsg("", "");
+    stravaProbed = true;
+    await stravaRefresh();
+  });
+
+  $("stravaconnect").addEventListener("click", async function(){
+    stravaMsg("", "");
+    const r = await stravaCall("auth-start", "POST");
+    if(r.reason === "nokey"){ stravaMsg("Saisis d'abord ta clé d'appareil.", "err"); STRAVA_STATE="nokey"; renderStravaCard(); return; }
+    if(r.status === 401){ stravaMsg("Clé d'appareil refusée.", "err"); STRAVA_STATE="badkey"; renderStravaCard(); return; }
+    if(r.status === 500 && r.body && r.body.error === "config"){
+      const m = Array.isArray(r.body.missing) ? r.body.missing.join(", ") : "";
+      stravaMsg("Configuration serveur incomplète" + (m ? " — variables manquantes : " + m : "") + ".", "err");
+      return;
+    }
+    if(!r.ok || !r.body || typeof r.body.url !== "string" || !r.body.url){
+      stravaMsg("Service indisponible — réessaie plus tard. L'app continue de fonctionner sans Strava.", "err");
+      STRAVA_STATE = "down"; renderStravaCard(); return;
+    }
+    // C'est le client qui ouvre l'URL : la cle d'appareil ne transite jamais
+    // par une URL, un journal ou un Referer.
+    try{ window.location.assign(r.body.url); }
+    catch(e){ stravaMsg("Impossible d'ouvrir la page d'autorisation Strava.", "err"); }
+  });
+
+  $("stravalogout").addEventListener("click", async function(){
+    const go = await askConfirm({
+      title: "Déconnecter Strava ?",
+      lines: [
+        "Le jeton d'accès conservé côté serveur sera supprimé.",
+        "Tes séances, ton journal et tes courses ne sont pas touchés.",
+        "Tu pourras te reconnecter à tout moment."
+      ],
+      okLabel: "Déconnecter",
+      cancelLabel: "Annuler",
+      danger: true
+    });
+    if(!go) return;
+    const r = await stravaCall("auth-logout", "POST");
+    if(r.reason === "nokey"){ stravaMsg("Saisis d'abord ta clé d'appareil.", "err"); return; }
+    if(r.status === 401){ stravaMsg("Clé d'appareil refusée.", "err"); STRAVA_STATE="badkey"; renderStravaCard(); return; }
+    if(!r.ok){ stravaMsg("Service indisponible — déconnexion non effectuée.", "err"); STRAVA_STATE="down"; renderStravaCard(); return; }
+    STRAVA_STATE = "off"; STRAVA_SINCE = "";
+    renderStravaCard();
+    stravaMsg("Strava déconnecté.", "ok");
+  });
+}catch(e){ /* la carte Strava ne doit jamais empecher l'app de demarrer */ }
+
 const pages = {plan:$("page-plan"), races:$("page-races"), journal:$("page-journal"), zones:$("page-zones")};
 ["plan","races","journal","zones"].forEach(t=>{
   $("tab-"+t).addEventListener("click", ()=>{
     Object.entries(pages).forEach(([k,el])=>el.classList.toggle("hidden", k!==t));
     ["plan","races","journal","zones"].forEach(k=>$("tab-"+k).classList.toggle("active", k===t));
     if(t==="journal") renderJournal();
+    // Interrogation PARESSEUSE : premiere ouverture de l'onglet Zones seulement,
+    // et en tache de fond (aucun await ici, l'affichage n'attend rien).
+    if(t==="zones" && !stravaProbed){
+      stravaProbed = true;
+      try{ stravaRefresh(); }catch(e){}
+    }
     window.scrollTo(0,0);
   });
 });
@@ -1405,6 +1577,9 @@ $("btnexport").addEventListener("click", async function(){
       return;
     }
   }
+  // L'export ne contient QUE les donnees d'entrainement et le plan.
+  // La cle d'appareil Strava (`strava-key`) n'y entre JAMAIS : ce fichier est
+  // destine a etre partage.
   const data={done:done, log:log, races:userRaces, v:8, exported:new Date().toISOString()};
   if(missing.length){ data.partial=true; data.unreadable=missing; }
   if(PLAN){ data.plan=PLAN; data.planSource=PLAN_SOURCE; }
@@ -1517,6 +1692,40 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
     // Filet de derniere instance : jamais d'ecran fige sur « Chargement du plan… ».
     try{ failToPlanError((e && e.message) || String(e)); }catch(_){}
   }
+})();
+
+/* Retour de auth-callback : purement local (aucun appel reseau), entierement
+   isole du chargement du plan, et sans effet si le parametre est absent. */
+(function stravaReturn(){
+  try{
+    const search = (window.location && window.location.search) || "";
+    if(search.indexOf("strava=") < 0) return;
+    const params = new URLSearchParams(search);
+    const code = params.get("strava");
+    if(!code) return;
+    const MSG = {
+      ok:          "Strava connecté ✓",
+      denied:      "Connexion Strava refusée sur la page d'autorisation.",
+      state:       "Lien de connexion invalide, expiré ou déjà utilisé — relance « Connecter Strava » depuis l'app.",
+      code:        "Réponse de Strava incomplète — réessaie.",
+      config:      "Configuration serveur incomplète — vérifie les variables Netlify.",
+      exchange:    "Strava n'a pas validé la connexion — réessaie.",
+      store:       "Autorisation obtenue mais non enregistrée côté serveur — réessaie.",
+      unavailable: "Service indisponible — réessaie plus tard.",
+      error:       "Erreur inattendue pendant la connexion Strava."
+    };
+    const msg = MSG[code] || ("Retour Strava : " + code);
+    // Nettoyage de l'URL : le parametre ne doit pas rester dans l'historique.
+    try{
+      params.delete("strava");
+      const q = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (q ? "?" + q : "") + (window.location.hash || ""));
+    }catch(e){}
+    try{ stravaMsg(msg, code === "ok" ? "ok" : "err"); }catch(e){}
+    if(code === "ok"){ STRAVA_STATE = "on"; try{ renderStravaCard(); }catch(e){} }
+    // Le toast est differe pour ne pas concurrencer l'affichage du plan.
+    setTimeout(function(){ try{ toast(msg, 6500); }catch(e){} }, 900);
+  }catch(e){ /* jamais bloquant */ }
 })();
 
 if('serviceWorker' in navigator){ window.addEventListener('load', function(){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }); }

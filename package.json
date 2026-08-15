@@ -1,0 +1,13 @@
+{
+  "name": "coaching-trail",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App d'entrainement trail. Ce package.json ne sert QU'aux fonctions serverless Netlify : aucune dependance cote client, aucune etape de build, index.html est servi tel quel.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8.0.0"
+  }
+}

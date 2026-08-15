@@ -1,7 +1,7 @@
 {
-  "name": "Le Montberou — Plan",
-  "short_name": "Montberou",
-  "description": "Plan d'entrainement trail d'Enzo",
+  "name": "Entraînement",
+  "short_name": "Entraînement",
+  "description": "Plan d'entrainement et suivi de seances",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
