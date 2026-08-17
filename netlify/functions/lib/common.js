@@ -127,42 +127,113 @@ function parseState(key, state) {
 }
 
 /* ---------- stockage (Netlify Blobs) ----------
+   Deux modes de defaillance a NE PAS confondre :
+     - 'unconfigured' : le magasin ne peut meme pas etre initialise (module
+       absent, Netlify Blobs non provisionne pour ce site). C'est une erreur
+       de configuration, pas un incident reseau.
+     - 'io'           : le magasin existe mais la lecture/ecriture echoue.
+   Le client a besoin de cette distinction pour afficher un message honnete.
+
    `setStoreFactory` est une couture d'injection de dependance, utilisee par
    le banc de test pour substituer un stockage simule. En production elle
    n'est jamais appelee et l'implementation reelle est chargee a la demande. */
+function StoreError(reason, cause) {
+  const e = new Error('store_' + reason);
+  e.name = 'StoreError';
+  e.reason = reason;                                  // 'unconfigured' | 'io'
+  e.causeName = (cause && cause.name) || '';          // NOM seulement, jamais le message
+  return e;
+}
+function isStoreError(e) { return !!e && e.name === 'StoreError'; }
+
 let storeFactory = null;
 function setStoreFactory(fn) { storeFactory = fn; }
+
+/* Options du magasin.
+   Par defaut : configuration AUTOMATIQUE fournie par le runtime Netlify.
+   Si (et seulement si) les deux variables optionnelles sont presentes, on
+   bascule en configuration EXPLICITE. Aucune valeur en dur, aucun defaut.
+   Enzo n'a a les renseigner que si la configuration automatique echoue :
+     NETLIFY_BLOBS_SITE_ID = l'API ID du site (Site configuration > General)
+     NETLIFY_BLOBS_TOKEN   = un jeton d'acces personnel Netlify
+   `consistency: 'strong'` n'est pas supporte partout : il n'est active que
+   si NETLIFY_BLOBS_CONSISTENCY vaut exactement "strong". */
+function storeOptions() {
+  const opts = { name: STORE_NAME };
+  const siteID = env('NETLIFY_BLOBS_SITE_ID');
+  const token = env('NETLIFY_BLOBS_TOKEN');
+  if (siteID && token) { opts.siteID = siteID; opts.token = token; }
+  if (env('NETLIFY_BLOBS_CONSISTENCY') === 'strong') opts.consistency = 'strong';
+  return opts;
+}
 async function getStore() {
-  if (storeFactory) return storeFactory(STORE_NAME);
-  const mod = await import('@netlify/blobs');
-  return mod.getStore({ name: STORE_NAME, consistency: 'strong' });
+  try {
+    // La couture de test suit exactement le meme chemin que la production :
+    // un echec d'obtention du magasin est un echec d'INITIALISATION.
+    if (storeFactory) return storeFactory(STORE_NAME);
+    const mod = await import('@netlify/blobs');
+    // Cas typique : « The environment has not been configured to use Netlify Blobs ».
+    return mod.getStore(storeOptions());
+  } catch (e) {
+    console.error('[strava] initialisation du magasin impossible :', (e && e.name) || 'Error',
+      '| configuration explicite :', (env('NETLIFY_BLOBS_SITE_ID') && env('NETLIFY_BLOBS_TOKEN')) ? 'oui' : 'non',
+      '| consistency :', env('NETLIFY_BLOBS_CONSISTENCY') || 'defaut');
+    throw StoreError('unconfigured', e);
+  }
+}
+/* Enveloppe toute erreur d'E/S en StoreError('io'), en laissant passer les
+   StoreError('unconfigured') levees par getStore(). */
+async function withStore(fn) {
+  const store = await getStore();
+  try {
+    return await fn(store);
+  } catch (e) {
+    console.error('[strava] operation de stockage en echec :', (e && e.name) || 'Error');
+    throw StoreError('io', e);
+  }
 }
 async function readToken() {
-  const store = await getStore();
-  const v = await store.get(TOKEN_KEY, { type: 'json' });
-  return v || null;
+  return withStore(async function (s) {
+    const v = await s.get(TOKEN_KEY, { type: 'json' });
+    return v || null;
+  });
 }
 async function writeToken(obj) {
-  const store = await getStore();
-  await store.setJSON(TOKEN_KEY, obj);
+  return withStore(function (s) { return s.setJSON(TOKEN_KEY, obj); });
 }
 async function deleteToken() {
-  const store = await getStore();
-  await store.delete(TOKEN_KEY);
+  return withStore(function (s) { return s.delete(TOKEN_KEY); });
 }
 async function putNonce(nonce, exp) {
-  const store = await getStore();
-  await store.setJSON(NONCE_PREFIX + nonce, { e: exp });
+  return withStore(function (s) { return s.setJSON(NONCE_PREFIX + nonce, { e: exp }); });
 }
 /* Usage unique : la lecture consomme le nonce. Un state rejoue ne trouve
    plus rien et est donc refuse. */
 async function takeNonce(nonce) {
-  const store = await getStore();
-  const k = NONCE_PREFIX + nonce;
-  const v = await store.get(k, { type: 'json' });
-  if (!v) return null;
-  try { await store.delete(k); } catch (e) { /* best effort */ }
-  return v;
+  return withStore(async function (s) {
+    const k = NONCE_PREFIX + nonce;
+    const v = await s.get(k, { type: 'json' });
+    if (!v) return null;
+    try { await s.delete(k); } catch (e) { /* best effort */ }
+    return v;
+  });
+}
+
+/* Reponse 503 normalisee : le client doit pouvoir dire « stockage serveur »
+   plutot que « hors-ligne ». */
+function storeFailure(e) {
+  const reason = isStoreError(e) ? e.reason : 'io';
+  return json(503, { error: 'blobs', reason: reason });
+}
+
+/* Variables d'environnement requises pour le flux OAuth. Renvoie la liste
+   des NOMS manquants (jamais de valeur). */
+function configMissing() {
+  const missing = [];
+  if (!env('STRAVA_CLIENT_ID')) missing.push('STRAVA_CLIENT_ID');
+  if (!env('STRAVA_CLIENT_SECRET')) missing.push('STRAVA_CLIENT_SECRET');
+  if (!siteOrigin()) missing.push('URL');
+  return missing;
 }
 
 /* ---------- echange du code OAuth ----------
@@ -209,6 +280,9 @@ module.exports = {
   methodNotAllowed: methodNotAllowed,
   accessKey: accessKey,
   checkKey: checkKey,
+  isStoreError: isStoreError,
+  storeFailure: storeFailure,
+  configMissing: configMissing,
   signState: signState,
   parseState: parseState,
   setStoreFactory: setStoreFactory,

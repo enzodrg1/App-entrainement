@@ -1396,8 +1396,13 @@ $("savealert-export").addEventListener("click", function(){
 const STRAVA_FN = "./.netlify/functions/";
 const STRAVA_TIMEOUT = 8000;
 let STRAVA_KEY = "";
-let STRAVA_STATE = "unknown";   // unknown | nokey | badkey | off | on | down | checking
+/* Etats possibles : unknown | checking | nokey | badkey | config | store
+   | offline | timeout | http | off | on
+   « down » a ete supprime : il melangeait des causes tres differentes et
+   affirmait « hors-ligne » alors que la fonction repondait. */
+let STRAVA_STATE = "unknown";
 let STRAVA_SINCE = "";
+let STRAVA_DIAG = {status:0, code:"", missing:[]};   // detail de diagnostic
 let stravaProbed = false;       // l'etat a-t-il deja ete interroge dans cette session ?
 
 function stravaMsg(text, cls){
@@ -1411,16 +1416,19 @@ async function stravaGetKey(){
   catch(e){ STRAVA_KEY = ""; }
   return STRAVA_KEY;
 }
-/* Appel reseau tolerant a l'echec : ne leve jamais, delai borne. */
+/* Appel reseau tolerant a l'echec : ne leve jamais, delai borne.
+   `reason` distingue le DELAI DEPASSE de l'ECHEC RESEAU : les confondre
+   empechait de savoir si le serveur repondait ou non. */
 async function stravaCall(path, method){
   const key = await stravaGetKey();
   if(!key) return {ok:false, status:0, reason:"nokey", body:null};
-  let ctl = null, timer = null;
+  let ctl = null, timer = null, timedOut = false;
   try{
     let opts = {method: method || "GET", cache:"no-store", headers:{"x-app-key": key}};
     if(typeof AbortController !== "undefined"){ ctl = new AbortController(); opts.signal = ctl.signal; }
     const guard = new Promise(function(_, reject){
       timer = setTimeout(function(){
+        timedOut = true;
         if(ctl){ try{ ctl.abort(); }catch(e){} }
         reject(new Error("timeout"));
       }, STRAVA_TIMEOUT);
@@ -1433,43 +1441,99 @@ async function stravaCall(path, method){
     })();
     return await Promise.race([work, guard]);
   }catch(e){
-    return {ok:false, status:0, reason:"network", body:null};
+    return {ok:false, status:0, reason: timedOut ? "timeout" : "network", body:null};
   }finally{
     if(timer) clearTimeout(timer);
   }
 }
+/* Classe une reponse en un etat unique et memorise le detail de diagnostic.
+   Rien de sensible n'y transite : uniquement un code HTTP, un code de motif
+   court, et des NOMS de variables d'environnement — et seulement apres que
+   la cle d'appareil a ete acceptee. */
+function stravaClassify(r){
+  STRAVA_DIAG = {status: (r && r.status) || 0, code: "", missing: []};
+  if(!r) return "offline";
+  if(r.reason === "nokey")   return "nokey";
+  if(r.reason === "timeout") return "timeout";
+  if(r.reason === "network") return "offline";
+  const body = isPlainObject(r.body) ? r.body : null;
+  if(r.status === 401) return "badkey";
+  if(r.status === 500 && body && body.error === "config"){
+    STRAVA_DIAG.code = "config";
+    STRAVA_DIAG.missing = arr(body.missing).filter(function(x){ return typeof x === "string"; });
+    return "config";
+  }
+  if(r.status === 503){
+    STRAVA_DIAG.code = (body && typeof body.reason === "string" && body.reason)
+      ? ((body.error || "blobs") + ":" + body.reason)
+      : ((body && typeof body.error === "string" && body.error) || "unavailable");
+    return "store";
+  }
+  if(r.ok) return "ok";
+  STRAVA_DIAG.code = (body && typeof body.error === "string") ? body.error : "";
+  return "http";
+}
+/* Message unique par etat. Le detail technique (code HTTP + motif) est
+   toujours affiche quand il existe, pour qu'Enzo puisse le rapporter. */
+function stravaText(state){
+  const d = STRAVA_DIAG || {status:0, code:"", missing:[]};
+  const http = d.status ? " (HTTP " + d.status + (d.code ? " · " + d.code : "") + ")" : "";
+  switch(state){
+    case "nokey":
+      return "Clé d'appareil requise — saisis-la ci-dessous, puis tape « Enregistrer la clé ».";
+    case "badkey":
+      return "Clé d'appareil refusée" + http + ". Vérifie qu'elle correspond exactement à APP_ACCESS_KEY dans les variables Netlify.";
+    case "config":
+      return "Configuration serveur incomplète" + http
+        + (d.missing.length ? " — variables manquantes : " + d.missing.join(", ") : "")
+        + ". À déclarer dans Netlify, puis redéployer.";
+    case "store":
+      return "Stockage serveur indisponible" + http
+        + ". La fonction répond : le problème est côté serveur (Netlify Blobs), pas ta connexion."
+        + (d.code.indexOf("unconfigured") > -1 ? " Blobs n'est pas provisionné pour ce site." : "");
+    case "offline":
+      return "Fonctions injoignables — hors-ligne, ou serveur inaccessible. L'app fonctionne normalement sans Strava.";
+    case "timeout":
+      return "Le serveur n'a pas répondu en " + (STRAVA_TIMEOUT / 1000) + " s. Réessaie avec « Vérifier ».";
+    case "http":
+      return "Réponse inattendue du serveur" + http + ". Signale ce code.";
+    case "checking":
+      return "Vérification en cours…";
+    case "on":
+      return "Connecté à Strava" + (STRAVA_SINCE ? " depuis le " + frNum(String(STRAVA_SINCE).slice(0,10)) : "") + ".";
+    case "off":
+      return "Clé reconnue — pas encore connecté à Strava.";
+    default:
+      return "État non vérifié — ouvre cet onglet ou tape « Vérifier ».";
+  }
+}
 function renderStravaCard(){
   const el = $("stravainfo"); if(!el) return;
-  let t;
-  switch(STRAVA_STATE){
-    case "nokey":    t = "Non configuré — saisis ta clé d'appareil ci-dessous."; break;
-    case "badkey":   t = "Clé d'appareil refusée par le serveur. Vérifie qu'elle correspond à APP_ACCESS_KEY."; break;
-    case "checking": t = "Vérification en cours…"; break;
-    case "on":       t = "Connecté à Strava" + (STRAVA_SINCE ? " depuis le " + frNum(String(STRAVA_SINCE).slice(0,10)) : "") + "."; break;
-    case "off":      t = "Clé reconnue — pas encore connecté à Strava."; break;
-    case "down":     t = "Service indisponible (hors-ligne ou fonctions injoignables). L'app fonctionne normalement sans."; break;
-    default:         t = "État non vérifié — ouvre cet onglet ou tape « Vérifier ».";
-  }
-  el.textContent = t;
+  el.textContent = stravaText(STRAVA_STATE);
 }
 async function stravaRefresh(){
   try{
     const key = await stravaGetKey();
-    if(!key){ STRAVA_STATE = "nokey"; renderStravaCard(); return; }
+    if(!key){ STRAVA_STATE = "nokey"; STRAVA_DIAG = {status:0, code:"", missing:[]}; renderStravaCard(); return; }
     STRAVA_STATE = "checking"; renderStravaCard();
     const r = await stravaCall("auth-status", "GET");
-    if(r.ok && r.body && typeof r.body.connected === "boolean"){
-      STRAVA_STATE = r.body.connected ? "on" : "off";
-      STRAVA_SINCE = (r.body.since && typeof r.body.since === "string") ? r.body.since : "";
-    } else if(r.status === 401){
-      STRAVA_STATE = "badkey";
+    const cls = stravaClassify(r);
+    if(cls === "ok"){
+      const body = isPlainObject(r.body) ? r.body : null;
+      if(body && typeof body.connected === "boolean"){
+        STRAVA_STATE = body.connected ? "on" : "off";
+        STRAVA_SINCE = (typeof body.since === "string") ? body.since : "";
+      } else {
+        STRAVA_STATE = "http";   // 200 mais corps inexploitable : on le dit
+        STRAVA_DIAG.code = "corps inattendu";
+      }
     } else {
-      STRAVA_STATE = "down";
+      STRAVA_STATE = cls;
     }
     renderStravaCard();
   }catch(e){
-    // Aucune remontee d'exception : au pire l'etat reste « indisponible ».
-    STRAVA_STATE = "down";
+    // Aucune remontee d'exception : au pire l'etat reste « injoignable ».
+    STRAVA_STATE = "offline";
     try{ renderStravaCard(); }catch(_){}
   }
 }
@@ -1496,20 +1560,22 @@ try{
   $("stravaconnect").addEventListener("click", async function(){
     stravaMsg("", "");
     const r = await stravaCall("auth-start", "POST");
-    if(r.reason === "nokey"){ stravaMsg("Saisis d'abord ta clé d'appareil.", "err"); STRAVA_STATE="nokey"; renderStravaCard(); return; }
-    if(r.status === 401){ stravaMsg("Clé d'appareil refusée.", "err"); STRAVA_STATE="badkey"; renderStravaCard(); return; }
-    if(r.status === 500 && r.body && r.body.error === "config"){
-      const m = Array.isArray(r.body.missing) ? r.body.missing.join(", ") : "";
-      stravaMsg("Configuration serveur incomplète" + (m ? " — variables manquantes : " + m : "") + ".", "err");
+    const cls = stravaClassify(r);
+    if(cls !== "ok"){
+      // Meme taxonomie que stravaRefresh : un seul vocabulaire d'erreurs.
+      STRAVA_STATE = cls; renderStravaCard();
+      stravaMsg(stravaText(cls), "err");
       return;
     }
-    if(!r.ok || !r.body || typeof r.body.url !== "string" || !r.body.url){
-      stravaMsg("Service indisponible — réessaie plus tard. L'app continue de fonctionner sans Strava.", "err");
-      STRAVA_STATE = "down"; renderStravaCard(); return;
+    const body = isPlainObject(r.body) ? r.body : null;
+    if(!body || typeof body.url !== "string" || !body.url){
+      STRAVA_STATE = "http"; STRAVA_DIAG.code = "url absente"; renderStravaCard();
+      stravaMsg(stravaText("http"), "err");
+      return;
     }
     // C'est le client qui ouvre l'URL : la cle d'appareil ne transite jamais
     // par une URL, un journal ou un Referer.
-    try{ window.location.assign(r.body.url); }
+    try{ window.location.assign(body.url); }
     catch(e){ stravaMsg("Impossible d'ouvrir la page d'autorisation Strava.", "err"); }
   });
 
@@ -1527,9 +1593,12 @@ try{
     });
     if(!go) return;
     const r = await stravaCall("auth-logout", "POST");
-    if(r.reason === "nokey"){ stravaMsg("Saisis d'abord ta clé d'appareil.", "err"); return; }
-    if(r.status === 401){ stravaMsg("Clé d'appareil refusée.", "err"); STRAVA_STATE="badkey"; renderStravaCard(); return; }
-    if(!r.ok){ stravaMsg("Service indisponible — déconnexion non effectuée.", "err"); STRAVA_STATE="down"; renderStravaCard(); return; }
+    const cls = stravaClassify(r);
+    if(cls !== "ok"){
+      STRAVA_STATE = cls; renderStravaCard();
+      stravaMsg("Déconnexion NON effectuée. " + stravaText(cls), "err");
+      return;
+    }
     STRAVA_STATE = "off"; STRAVA_SINCE = "";
     renderStravaCard();
     stravaMsg("Strava déconnecté.", "ok");
@@ -1711,6 +1780,7 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
       config:      "Configuration serveur incomplète — vérifie les variables Netlify.",
       exchange:    "Strava n'a pas validé la connexion — réessaie.",
       store:       "Autorisation obtenue mais non enregistrée côté serveur — réessaie.",
+      blobs:       "Stockage serveur (Netlify Blobs) non configuré — la connexion n'a pas pu être enregistrée.",
       unavailable: "Service indisponible — réessaie plus tard.",
       error:       "Erreur inattendue pendant la connexion Strava."
     };

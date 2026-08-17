@@ -19,8 +19,7 @@ exports.handler = async function (event) {
     try {
       await C.deleteToken();
     } catch (e) {
-      console.error('[strava] suppression du token impossible');
-      return C.json(503, { error: 'unavailable' });
+      return C.storeFailure(e);
     }
     return C.json(200, { connected: false });
   } catch (e) {

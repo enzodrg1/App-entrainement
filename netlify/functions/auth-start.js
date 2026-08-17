@@ -25,11 +25,8 @@ exports.handler = async function (event) {
 
     const clientId = C.env('STRAVA_CLIENT_ID');
     const origin = C.siteOrigin();
-    const missing = [];
-    if (!clientId) missing.push('STRAVA_CLIENT_ID');
     // Presence seulement : la VALEUR du secret n'est ni lue ici, ni renvoyee.
-    if (!C.env('STRAVA_CLIENT_SECRET')) missing.push('STRAVA_CLIENT_SECRET');
-    if (!origin) missing.push('URL');
+    const missing = C.configMissing();
     if (missing.length) {
       console.warn('[strava] variables d environnement manquantes :', missing.join(', '));
       return C.json(500, { error: 'config', missing: missing });
@@ -40,8 +37,7 @@ exports.handler = async function (event) {
     try {
       await C.putNonce(nonce, exp);
     } catch (e) {
-      console.error('[strava] stockage du nonce impossible');
-      return C.json(503, { error: 'unavailable' });
+      return C.storeFailure(e);
     }
 
     const state = C.signState(C.accessKey(), nonce, exp);

@@ -53,8 +53,9 @@ exports.handler = async function (event) {
     try {
       nonce = await C.takeNonce(parsed.n);       // consommation : usage unique
     } catch (e) {
-      console.error('[strava] lecture du nonce impossible');
-      return back('unavailable');
+      // Redirection : on ne peut pas renvoyer de JSON, on distingue tout de
+      // meme le stockage non configure d'une panne d'E/S.
+      return back(C.isStoreError(e) && e.reason === 'unconfigured' ? 'blobs' : 'unavailable');
     }
     if (!nonce) return back('state');                                  // inconnu ou deja utilise
     if (typeof nonce.e === 'number' && Date.now() > nonce.e) return back('state');
@@ -91,8 +92,7 @@ exports.handler = async function (event) {
         connected_at: new Date().toISOString()
       });
     } catch (e) {
-      console.error('[strava] ecriture du token impossible');
-      return back('store');
+      return back(C.isStoreError(e) && e.reason === 'unconfigured' ? 'blobs' : 'store');
     }
 
     return back('ok');

@@ -16,13 +16,23 @@ exports.handler = async function (event) {
 
     const denied = C.checkKey(event);
     if (denied) return denied;
+    // A partir d'ici l'appelant est authentifie : le detail de diagnostic
+    // qui suit n'est jamais visible d'un inconnu.
+
+    // Aligne sur auth-start : une configuration incomplete se dit, elle ne
+    // se deguise pas en « service indisponible ».
+    const missing = C.configMissing();
+    if (missing.length) {
+      console.warn('[strava] variables d environnement manquantes :', missing.join(', '));
+      return C.json(500, { error: 'config', missing: missing });
+    }
 
     let token = null;
     try {
       token = await C.readToken();
     } catch (e) {
-      console.error('[strava] lecture du stockage impossible');
-      return C.json(503, { error: 'unavailable' });
+      // 'unconfigured' = Blobs non provisionne ; 'io' = lecture en echec.
+      return C.storeFailure(e);
     }
 
     if (!token || typeof token.refresh_token !== 'string' || !token.refresh_token) {

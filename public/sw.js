@@ -1,4 +1,4 @@
-const C = 'coaching-trail-v12';
+const C = 'coaching-trail-v13';
 const ASSETS = ['./','./index.html','./plan.json','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-512-maskable.png','./apple-touch-icon.png'];
 
 // addAll() rejette EN BLOC : un seul asset manquant (404 sur plan.json par ex.)
