@@ -29,7 +29,7 @@ exports.handler = async function (event) {
 
     let token = null;
     try {
-      token = await C.readToken();
+      token = await C.readToken(event);
     } catch (e) {
       // 'unconfigured' = Blobs non provisionne ; 'io' = lecture en echec.
       return C.storeFailure(e);

@@ -35,7 +35,7 @@ exports.handler = async function (event) {
     const nonce = crypto.randomBytes(18).toString('hex');
     const exp = Date.now() + C.STATE_TTL_MS;
     try {
-      await C.putNonce(nonce, exp);
+      await C.putNonce(event, nonce, exp);
     } catch (e) {
       return C.storeFailure(e);
     }

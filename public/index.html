@@ -1473,6 +1473,19 @@ function stravaClassify(r){
   STRAVA_DIAG.code = (body && typeof body.error === "string") ? body.error : "";
   return "http";
 }
+/* Aide contextuelle pour un echec de stockage. Le motif brut reste affiche
+   a cote : cette phrase ne le remplace pas, elle l'explique.
+   Motifs produits par netlify/functions/lib/common.js. */
+function stravaStoreHint(code){
+  const c = String(code || ""), i = c.indexOf(":");
+  switch(i > -1 ? c.slice(i + 1) : c){
+    case "module":       return " Le paquet @netlify/blobs n'est pas embarqué dans la fonction.";
+    case "lambda":       return " Aucun contexte Blobs n'est parvenu à la fonction : le runtime n'en a pas fourni.";
+    case "unconfigured": return " Un contexte Blobs existe, mais le magasin refuse de s'initialiser.";
+    case "io":           return " Le magasin répond, mais l'opération a échoué.";
+    default:             return "";
+  }
+}
 /* Message unique par etat. Le detail technique (code HTTP + motif) est
    toujours affiche quand il existe, pour qu'Enzo puisse le rapporter. */
 function stravaText(state){
@@ -1490,7 +1503,7 @@ function stravaText(state){
     case "store":
       return "Stockage serveur indisponible" + http
         + ". La fonction répond : le problème est côté serveur (Netlify Blobs), pas ta connexion."
-        + (d.code.indexOf("unconfigured") > -1 ? " Blobs n'est pas provisionné pour ce site." : "");
+        + stravaStoreHint(d.code);
     case "offline":
       return "Fonctions injoignables — hors-ligne, ou serveur inaccessible. L'app fonctionne normalement sans Strava.";
     case "timeout":

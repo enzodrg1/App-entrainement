@@ -15,6 +15,13 @@ const C = require('./lib/common.js');
 
 const ALLOWED = ['GET'];
 
+/* Motifs de StoreError qui signalent un magasin non initialisable (par
+   opposition a 'io', une simple panne d'operation). Ils sont tous rapportes
+   a l'app sous le code 'blobs'. */
+function isInitFailure(e) {
+  return C.isStoreError(e) && (e.reason === 'unconfigured' || e.reason === 'lambda' || e.reason === 'module');
+}
+
 /* Codes de resultat volontairement grossiers : ils n'exposent aucun detail
    de configuration ni de reponse Strava. */
 function back(status) {
@@ -51,11 +58,11 @@ exports.handler = async function (event) {
 
     let nonce = null;
     try {
-      nonce = await C.takeNonce(parsed.n);       // consommation : usage unique
+      nonce = await C.takeNonce(event, parsed.n);       // consommation : usage unique
     } catch (e) {
       // Redirection : on ne peut pas renvoyer de JSON, on distingue tout de
       // meme le stockage non configure d'une panne d'E/S.
-      return back(C.isStoreError(e) && e.reason === 'unconfigured' ? 'blobs' : 'unavailable');
+      return back(isInitFailure(e) ? 'blobs' : 'unavailable');
     }
     if (!nonce) return back('state');                                  // inconnu ou deja utilise
     if (typeof nonce.e === 'number' && Date.now() > nonce.e) return back('state');
@@ -83,7 +90,7 @@ exports.handler = async function (event) {
     }
 
     try {
-      await C.writeToken({
+      await C.writeToken(event, {
         refresh_token: data.refresh_token,
         access_token: (typeof data.access_token === 'string') ? data.access_token : '',
         expires_at: Number(data.expires_at) || 0,
@@ -92,7 +99,7 @@ exports.handler = async function (event) {
         connected_at: new Date().toISOString()
       });
     } catch (e) {
-      return back(C.isStoreError(e) && e.reason === 'unconfigured' ? 'blobs' : 'store');
+      return back(isInitFailure(e) ? 'blobs' : 'store');
     }
 
     return back('ok');

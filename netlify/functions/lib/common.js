@@ -127,12 +127,24 @@ function parseState(key, state) {
 }
 
 /* ---------- stockage (Netlify Blobs) ----------
-   Deux modes de defaillance a NE PAS confondre :
-     - 'unconfigured' : le magasin ne peut meme pas etre initialise (module
-       absent, Netlify Blobs non provisionne pour ce site). C'est une erreur
-       de configuration, pas un incident reseau.
+   Quatre modes de defaillance a NE PAS confondre :
+     - 'module'       : import('@netlify/blobs') a echoue (paquet absent du
+       bundle de la fonction).
+     - 'lambda'       : aucun contexte Blobs nulle part (ni dans l'event, ni
+       dans l'environnement) et aucune configuration explicite. Voir plus bas.
+     - 'unconfigured' : le module est la, le contexte semble la, mais
+       mod.getStore() refuse d'initialiser le magasin.
      - 'io'           : le magasin existe mais la lecture/ecriture echoue.
    Le client a besoin de cette distinction pour afficher un message honnete.
+
+   MODE DE COMPATIBILITE LAMBDA : ces fonctions sont ecrites en Functions
+   API v1 (exports.handler). Dans ce mode le runtime Netlify n'injecte PAS
+   NETLIFY_BLOBS_CONTEXT dans l'environnement ; le contexte arrive dans
+   l'objet event (event.blobs + en-tetes x-nf-site-id / x-nf-deploy-id).
+   Il faut donc appeler mod.connectLambda(event) JUSTE avant mod.getStore().
+   C'est pourquoi toutes les fonctions de stockage prennent l'event en
+   premier parametre : la dependance est explicite et tracable, aucun etat
+   de module mutable ne la porte en douce.
 
    `setStoreFactory` est une couture d'injection de dependance, utilisee par
    le banc de test pour substituer un stockage simule. En production elle
@@ -140,7 +152,7 @@ function parseState(key, state) {
 function StoreError(reason, cause) {
   const e = new Error('store_' + reason);
   e.name = 'StoreError';
-  e.reason = reason;                                  // 'unconfigured' | 'io'
+  e.reason = reason;                                  // 'module' | 'lambda' | 'unconfigured' | 'io'
   e.causeName = (cause && cause.name) || '';          // NOM seulement, jamais le message
   return e;
 }
@@ -166,25 +178,120 @@ function storeOptions() {
   if (env('NETLIFY_BLOBS_CONSISTENCY') === 'strong') opts.consistency = 'strong';
   return opts;
 }
-async function getStore() {
+/* Le contexte Blobs est-il present dans l'event Lambda ?
+   On teste la PRESENCE de la chaine, jamais son contenu : event.blobs est un
+   secret (il porte l'URL et le jeton du magasin). Il ne doit apparaitre dans
+   aucun journal, ni brut ni decode. */
+function hasLambdaBlobs(event) {
+  return !!(event && typeof event.blobs === 'string' && event.blobs);
+}
+/* Configuration EXPLICITE : les deux variables optionnelles renseignees.
+   Elle a la priorite sur le contexte du runtime (cf. getStore). */
+function hasExplicitConfig() {
+  return !!(env('NETLIFY_BLOBS_SITE_ID') && env('NETLIFY_BLOBS_TOKEN'));
+}
+/* Un contexte Blobs est-il DEJA dans l'environnement ? Meme detection que la
+   bibliotheque (getEnvironmentContext) : la variable globale d'abord, la
+   variable d'environnement ensuite. Cas de « netlify dev » en local, ou d'un
+   runtime qui injecterait le contexte de lui-meme.
+   Meme contrat que la bibliotheque : seule une CHAINE NON VIDE compte. Un
+   objet, un tableau ou un nombre ne sont pas un contexte.
+   PRESENCE seulement : cette valeur porte un jeton, elle n'est ni lue en
+   detail ni journalisee. */
+function hasEnvContext() {
+  const g = globalThis.netlifyBlobsContext;
+  const fromGlobal = (typeof g === 'string') && !!g.trim();
+  return fromGlobal || !!env('NETLIFY_BLOBS_CONTEXT');   // env() : chaine non vide, deja trimee
+}
+/* Etat du contexte d'environnement AU DEMARRAGE DU CONTENEUR, fige avant que
+   la moindre invocation ait pu appeler connectLambda.
+   POURQUOI : connectLambda() ecrit lui-meme process.env.NETLIFY_BLOBS_CONTEXT
+   (setEnvironmentContext). Sur un conteneur chaud, une relecture "live" verrait
+   donc une variable posee par NOUS et le journal affirmerait a tort que le
+   runtime fournit le contexte — soit l'inverse du diagnostic reel. Seule cette
+   photo initiale repond a la question « le runtime nous a-t-il fourni un
+   contexte ? ». */
+const BOOT_ENV_CONTEXT = hasEnvContext();
+
+/* Ordre de precedence :
+     a. couture de test posee            -> on l'utilise telle quelle
+     b. configuration explicite presente -> storeOptions() suffit, pas de
+        connectLambda (l'explicite gagne)
+     c. contexte dans l'event (lambda)   -> connectLambda(event) puis getStore.
+        Prioritaire sur (d) : le contexte de l'invocation est le plus frais.
+     d. contexte deja dans l'environnement -> getStore direct, sans
+        connectLambda. Ne concerne PAS la production en mode Lambda, ou
+        NETLIFY_BLOBS_CONTEXT est justement absent ; sert au local.
+     e. rien de tout cela                -> StoreError('lambda') */
+async function getStore(event) {
+  if (storeFactory) {
+    try {
+      // La couture de test suit exactement le meme chemin que la production :
+      // un echec d'obtention du magasin est un echec d'INITIALISATION.
+      return storeFactory(STORE_NAME);
+    } catch (e) {
+      console.error('[strava] initialisation du magasin impossible (fabrique de test) :', (e && e.name) || 'Error');
+      throw StoreError('unconfigured', e);
+    }
+  }
+
+  let mod;
   try {
-    // La couture de test suit exactement le meme chemin que la production :
-    // un echec d'obtention du magasin est un echec d'INITIALISATION.
-    if (storeFactory) return storeFactory(STORE_NAME);
-    const mod = await import('@netlify/blobs');
+    mod = await import('@netlify/blobs');
+  } catch (e) {
+    console.error('[strava] module @netlify/blobs introuvable :', (e && e.name) || 'Error');
+    throw StoreError('module', e);
+  }
+
+  const explicit = hasExplicitConfig();
+  if (!explicit) {
+    const hasBlobs = hasLambdaBlobs(event);
+    const envNow = hasEnvContext();
+    /* Ligne d'INFORMATION (console.log) : un succes ne doit pas remplir les
+       journaux Netlify de lignes ERROR, sinon le prochain incident sera
+       illisible. Booleens uniquement : jamais la valeur.
+       Les deux mesures d'environnement sont distinguees car elles ne disent
+       pas la meme chose : « au demarrage » = ce que le runtime a fourni ;
+       « maintenant » = ce qui est en place, connectLambda compris. */
+    console.log('[strava] contexte blobs | event :', hasBlobs ? 'present' : 'absent',
+      '| environnement au demarrage du conteneur :', BOOT_ENV_CONTEXT ? 'present' : 'absent',
+      '| environnement maintenant :', envNow ? 'present' : 'absent');
+    if (hasBlobs) {
+      if (typeof mod.connectLambda !== 'function') {
+        console.error('[strava] connectLambda absent du module @netlify/blobs');
+        throw StoreError('lambda');
+      }
+      try {
+        mod.connectLambda(event);         // doit preceder immediatement getStore
+      } catch (e) {
+        console.error('[strava] contexte blobs lambda inexploitable :', (e && e.name) || 'Error');
+        throw StoreError('unconfigured', e);
+      }
+    } else if (!envNow) {
+      // Ni event.blobs, ni contexte d'environnement, ni configuration
+      // explicite : le magasin ne peut pas etre initialise. Chemin d'echec,
+      // donc ERROR assume.
+      console.error('[strava] aucun contexte blobs : event absent, environnement au demarrage du conteneur :',
+        BOOT_ENV_CONTEXT ? 'present' : 'absent');
+      throw StoreError('lambda');
+    }
+    // else : contexte deja en place, mod.getStore() se debrouille seul.
+  }
+
+  try {
     // Cas typique : « The environment has not been configured to use Netlify Blobs ».
     return mod.getStore(storeOptions());
   } catch (e) {
     console.error('[strava] initialisation du magasin impossible :', (e && e.name) || 'Error',
-      '| configuration explicite :', (env('NETLIFY_BLOBS_SITE_ID') && env('NETLIFY_BLOBS_TOKEN')) ? 'oui' : 'non',
+      '| configuration explicite :', explicit ? 'oui' : 'non',
       '| consistency :', env('NETLIFY_BLOBS_CONSISTENCY') || 'defaut');
     throw StoreError('unconfigured', e);
   }
 }
 /* Enveloppe toute erreur d'E/S en StoreError('io'), en laissant passer les
-   StoreError('unconfigured') levees par getStore(). */
-async function withStore(fn) {
-  const store = await getStore();
+   StoreError d'initialisation levees par getStore(). */
+async function withStore(event, fn) {
+  const store = await getStore(event);
   try {
     return await fn(store);
   } catch (e) {
@@ -192,25 +299,25 @@ async function withStore(fn) {
     throw StoreError('io', e);
   }
 }
-async function readToken() {
-  return withStore(async function (s) {
+async function readToken(event) {
+  return withStore(event, async function (s) {
     const v = await s.get(TOKEN_KEY, { type: 'json' });
     return v || null;
   });
 }
-async function writeToken(obj) {
-  return withStore(function (s) { return s.setJSON(TOKEN_KEY, obj); });
+async function writeToken(event, obj) {
+  return withStore(event, function (s) { return s.setJSON(TOKEN_KEY, obj); });
 }
-async function deleteToken() {
-  return withStore(function (s) { return s.delete(TOKEN_KEY); });
+async function deleteToken(event) {
+  return withStore(event, function (s) { return s.delete(TOKEN_KEY); });
 }
-async function putNonce(nonce, exp) {
-  return withStore(function (s) { return s.setJSON(NONCE_PREFIX + nonce, { e: exp }); });
+async function putNonce(event, nonce, exp) {
+  return withStore(event, function (s) { return s.setJSON(NONCE_PREFIX + nonce, { e: exp }); });
 }
 /* Usage unique : la lecture consomme le nonce. Un state rejoue ne trouve
    plus rien et est donc refuse. */
-async function takeNonce(nonce) {
-  return withStore(async function (s) {
+async function takeNonce(event, nonce) {
+  return withStore(event, async function (s) {
     const k = NONCE_PREFIX + nonce;
     const v = await s.get(k, { type: 'json' });
     if (!v) return null;

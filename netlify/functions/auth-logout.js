@@ -17,7 +17,7 @@ exports.handler = async function (event) {
     if (denied) return denied;
 
     try {
-      await C.deleteToken();
+      await C.deleteToken(event);
     } catch (e) {
       return C.storeFailure(e);
     }
