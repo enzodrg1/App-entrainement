@@ -62,6 +62,9 @@ h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size
 .chip{font-size:11px; color:var(--muted); background:var(--panel2); border-radius:6px; padding:2px 7px}
 .chip.hot{color:var(--orange); background:var(--orange-soft)}
 .chip.care{color:var(--amber); background:rgba(224,168,62,.12)}
+/* Puce Strava : moss, VOLONTAIREMENT distincte d'une validation manuelle.
+   L'ambre reste reserve aux alertes sante, jamais a du decoratif Strava. */
+.chip.strava{color:var(--moss); background:var(--moss-soft); border:1px solid rgba(134,180,154,.35)}
 .day .checkcol{flex:none; display:flex; align-items:center; padding-right:12px}
 .check{width:26px; height:26px; border-radius:50%; border:2px solid var(--dim); display:flex; align-items:center; justify-content:center; font-size:14px; color:transparent; flex:none}
 .day.done{opacity:.55}
@@ -70,6 +73,9 @@ h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size
    ou un ressenti est sauvegarde alors que l'ecriture a echoue. */
 .day.unsaved{border-color:rgba(224,168,62,.55); opacity:1}
 .day.unsaved .check{border-color:var(--amber); background:rgba(224,168,62,.14); color:var(--amber)}
+/* Coche DEDUITE de Strava : contour en pointilles, pour ne jamais la
+   confondre avec une seance qu'Enzo a confirmee lui-meme. */
+.day.done.auto .check{border-style:dashed}
 .day.today{border-color:rgba(255,107,53,.5)}
 .day.today .dow{color:var(--orange)}
 .day.race{background:linear-gradient(100deg, rgba(255,107,53,.16), var(--panel) 60%)}
@@ -125,6 +131,11 @@ nav.tabs .ico{font-size:17px; line-height:1}
 .addform{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:6px}
 .addform h3{font-family:var(--disp); text-transform:uppercase; font-weight:600; letter-spacing:.08em; font-size:14px; margin:0 0 10px; color:var(--moss)}
 .frow{display:flex; gap:8px; margin-bottom:8px}
+/* Rangee de 3 boutons. A 375 px il reste ~77 px de texte par bouton : on
+   reduit legerement le corps et les marges laterales pour que les libelles
+   tiennent sur UNE ligne, et on autorise le passage a la ligne en dessous. */
+.frow.wrap{flex-wrap:wrap}
+.frow.wrap .btn{min-width:92px; font-size:14px; padding:12px 6px}
 .addform input{flex:1; min-width:0; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; color:var(--ink); font-size:14.5px; font-family:var(--body)}
 .addform input::placeholder{color:var(--dim)}
 table.zones{width:100%; border-collapse:collapse; font-size:13.5px}
@@ -163,6 +174,8 @@ body.hasalert header{padding-top:14px}
 .today-card .tc-title{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:19px; line-height:1.05}
 .today-card .tc-sub{font-size:12.5px; color:var(--muted); margin-top:2px}
 .today-card .tc-go{font-size:20px; color:var(--orange); flex:none}
+.today-card .tc-real{font-size:12px; color:var(--moss); margin-top:4px; line-height:1.4}
+.today-card .tc-real .sm{color:var(--muted)}
 .today-card.done{opacity:.72}
 .today-card.restday{background:var(--panel); border-color:var(--line)}
 /* journal editor in sheet */
@@ -187,6 +200,12 @@ body.hasalert header{padding-top:14px}
 .jentry .je-note{font-size:13px; color:var(--ink); margin-top:4px; opacity:.9; white-space:pre-wrap}
 .jentry .je-pains{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
 .pchip{font-size:11px; padding:2px 8px; border-radius:6px; background:rgba(224,168,62,.14); color:var(--amber)}
+/* Realise (Strava) dans la fiche de seance */
+.strava-line{font-size:14px; line-height:1.45; margin:0 0 6px; color:var(--ink)}
+.strava-line .sm{color:var(--muted); font-size:12.5px}
+.strava-act{font-size:13px; color:var(--muted); padding:6px 0; border-bottom:1px dashed var(--line); line-height:1.4; word-break:break-word; overflow-wrap:anywhere}
+.strava-act:last-child{border-bottom:none}
+.strava-act b{color:var(--ink); font-weight:600}
 .empty{color:var(--dim); font-size:13.5px; text-align:center; padding:24px 10px; line-height:1.6}
 /* font-size 16px obligatoire : en dessous, iOS zoome automatiquement au focus sans dezoomer */
 textarea.io{width:100%; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px; color:var(--ink); font-size:16px; font-family:monospace; min-height:70px; margin-top:8px}
@@ -333,9 +352,10 @@ input.io::placeholder{color:var(--dim)}
     <h3>🔗 Strava</h3>
     <p class="note" id="stravainfo" style="margin-top:0">État non vérifié.</p>
     <input class="io" type="password" id="stravakey" placeholder="Clé d'appareil" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Clé d'appareil">
-    <div class="frow" style="margin-top:8px"><button class="btn ghost" id="stravasave" type="button">Enregistrer la clé</button><button class="btn ghost" id="stravacheck" type="button">Vérifier</button></div>
+    <div class="frow wrap" style="margin-top:8px"><button class="btn ghost" id="stravasave" type="button">Enregistrer</button><button class="btn ghost" id="stravacheck" type="button">Vérifier</button><button class="btn ghost" id="stravasync" type="button">Synchroniser</button></div>
     <div class="frow"><button class="btn ghost" id="stravaconnect" type="button">Connecter Strava</button><button class="btn ghost" id="stravalogout" type="button">Déconnecter</button></div>
     <div class="note plan-msg hidden" id="stravamsg"></div>
+    <p class="note hidden" id="stravasyncinfo"></p>
     <p class="note">Ce site est public : la <b>clé d'appareil</b> est ce qui empêche un inconnu de lire tes sorties ou de détourner la connexion. Génère-la toi-même, déclare-la dans les variables Netlify sous <b>APP_ACCESS_KEY</b>, puis saisis-la ici une fois. Elle reste sur cet appareil et <b>n'est jamais incluse dans l'export de sauvegarde</b>.</p>
     <p class="note">La synchronisation est un bonus : l'app fonctionne exactement pareil sans Strava, y compris hors-ligne.</p>
   </div>
@@ -582,6 +602,41 @@ let userRaces = [];
 let curWk = 0;
 let sheetDay = null;
 let log = {};
+
+/* ======================================================================
+   ETAT STRAVA (etapes B2/B3) — DECLARE ICI VOLONTAIREMENT, PAS EN BAS.
+   Les fonctions du module Strava vivent en fin de script : les declarations
+   de fonction sont hoistees, elles. Ces `const`/`let` ne le sont PAS — ils
+   restent en zone morte temporelle tant que le script n'a pas atteint leur
+   ligne. Or isDone(), renderWeek() et renderToday() les lisent.
+   Les laisser en bas du fichier, c'etait parier qu'aucun rendu ne serait
+   jamais declenche plus tot. NE PAS LES REDESCENDRE.
+   ====================================================================== */
+const STRAVA_CACHE_KEY = "tgcm-strava-cache";  // cle JETABLE et reconstructible
+const STRAVA_CACHE_V   = 1;                    // schema : un cache d'une AUTRE version est ignore
+const STRAVA_TTL_MS    = 30 * 60 * 1000;       // 30 min : au-dela, perime mais toujours AFFICHE
+const STRAVA_DAYS      = 90;
+const STRAVA_REAUTH_RETRY_MS = 900;            // delai avant l'appel de CONFIRMATION d'un reauth
+const STRAVA_CLOCK_SKEW_MS = 60 * 1000;        // tolerance d'horloge avant de juger un horodatage futur
+
+/* Types qui COCHENT une seance. Un tableau, pas un objet : un objet expose
+   « constructor », « toString »... et ferait passer n'importe quoi pour un run.
+   DEFAUT SUR : tout ce qui n'est pas dans cette liste — y compris un type
+   inconnu, vide ou null — s'affiche mais ne coche JAMAIS. */
+const STRAVA_DONE_TYPES = ["Run", "TrailRun", "Workout"];
+const STRAVA_SPORT_LABEL = {
+  Run:"Course à pied", TrailRun:"Trail", Workout:"Séance",
+  Ride:"Vélo", VirtualRide:"Vélo (home-trainer)", EBikeRide:"Vélo électrique",
+  Swim:"Natation", WeightTraining:"Renfo / muscu", Crossfit:"Crossfit",
+  Hike:"Randonnée", Walk:"Marche", AlpineSki:"Ski alpin", BackcountrySki:"Ski de rando",
+  NordicSki:"Ski nordique", Rowing:"Rameur", Elliptical:"Elliptique",
+  StairStepper:"Escalier", Yoga:"Yoga", Golf:"Golf", Soccer:"Football"
+};
+
+let STRAVA_ACTS = null;      // {at, connected, days, count, truncated, partial, stop, acts, byDay}
+let stravaSyncing = false;   // verrou : JAMAIS deux appels `activities` en parallele
+let stravaAutoTried = false; // la synchro d'ouverture n'a lieu qu'une fois par session
+let STRAVA_SYNC_ERR = "";    // dernier message de synchro en echec (carte Zones)
 const $ = id => document.getElementById(id);
 const TYPE_LABEL = {off:"Repos", easy:"Endurance", qual:"Qualité", renfo:"Renfo", long:"Sortie longue", race:"Course"};
 const FEELS = [["good","👍 Bien"],["ok","😐 Bof"],["hard","🥵 Dur"]];
@@ -989,7 +1044,9 @@ function renderWeek(){
   const w = WEEKS[curWk];
   if(!w) return;
   $("wktitle").textContent = w.label;
-  const nDone = w.days.filter(d=>done[d.d]).length;
+  // isDone() est la SEULE lecture de l'etat « fait » : coche manuelle (true),
+  // decochage explicite (false), ou deduction d'une activite Strava du jour.
+  const nDone = w.days.filter(d=>d.t!=="off" && isDone(d.d)).length;
   const nS = w.days.filter(d=>d.t!=="off").length;
   $("wkmeta").textContent = w.phase+" · "+weekKm(w)+" km · "+nDone+"/"+nS+" faites";
   $("prevwk").disabled = curWk===0;
@@ -998,9 +1055,11 @@ function renderWeek(){
   $("days").innerHTML = "";
   w.days.forEach(day=>{
     const b = document.createElement("button");
-    b.className = "day "+(day.t==="long"?"qual":day.t)+(done[day.d]?" done":"")+(day.d===tISO?" today":"")+(unsavedDays[day.d]?" unsaved":"");
+    const dn = isDone(day.d), auto = stravaAutoDone(day.d);
+    b.className = "day "+(day.t==="long"?"qual":day.t)+(dn?" done":"")+(auto?" auto":"")+(day.d===tISO?" today":"")+(unsavedDays[day.d]?" unsaved":"");
     let chips = '<span class="chip">'+esc(TYPE_LABEL[day.t])+'</span>';
     if(unsavedDays[day.d]) chips += '<span class="chip care">⚠ non enregistré</span>';
+    chips += stravaChipHTML(day.d);
     if(day.km) chips += '<span class="chip">≈ '+esc(day.km)+' km</span>';
     if(day.fc) chips += '<span class="chip hot">FC '+esc(day.fc)+'</span>';
     if(day.pace) chips += '<span class="chip hot">'+esc(day.pace)+'/km</span>';
@@ -1031,10 +1090,11 @@ function openSheet(day){
     else html += list.map(i=>'<p>'+esc(i)+'</p>').join("");
     html += "</div>";
   }
+  html += stravaSheetHTML(day);
   html += journalEditorHTML(day);
   $("sheetbody").innerHTML = html;
   bindJournalEditor(day);
-  $("togdone").textContent = done[day.d] ? "Annuler ✓" : "Marquer faite ✓";
+  $("togdone").textContent = isDone(day.d) ? "Annuler ✓" : "Marquer faite ✓";
   $("overlay").classList.add("open"); $("sheet").classList.add("open");
 }
 function closeSheet(){ $("overlay").classList.remove("open"); $("sheet").classList.remove("open"); sheetDay=null; }
@@ -1043,7 +1103,9 @@ $("closesheet").addEventListener("click", closeSheet);
 $("togdone").addEventListener("click", async ()=>{
   if(!sheetDay) return;
   const iso = sheetDay.d;
-  if(done[iso]) delete done[iso]; else done[iso]=true;
+  // TROIS etats : cocher -> true, decocher -> false. JAMAIS delete : decocher
+  // est une decision explicite, qui doit resister a la synchro Strava suivante.
+  done[iso] = !isDone(iso);
   const ok = await saveUser("tgcm-done", done, iso);
   // Jamais « Séance validée 💪 » si rien n'a ete enregistre.
   if(ok) toast(done[iso] ? "Séance validée 💪" : "Séance décochée");
@@ -1097,21 +1159,23 @@ function bindJournalEditor(day){
   if(sl) sl.addEventListener('change', async function(){ cur().sleep=sl.value.trim(); await persist(); });
   if(rh) rh.addEventListener('change', async function(){ cur().rhr=rh.value.trim(); await persist(); });
 }
-function allSessions(){ let t=0,d=0; WEEKS.forEach(function(w){ arr(w && w.days).forEach(function(x){ if(x && x.t!=='off'){ t++; if(done[x.d]) d++; } }); }); return {t:t,d:d}; }
+function allSessions(){ let t=0,d=0; WEEKS.forEach(function(w){ arr(w && w.days).forEach(function(x){ if(x && x.t!=='off'){ t++; if(isDone(x.d)) d++; } }); }); return {t:t,d:d}; }
 function renderProgress(){ const s=allSessions(); const pct=s.t?Math.round(s.d/s.t*100):0; $("progbar").style.width=pct+"%"; $("proglbl").textContent=s.d+" / "+s.t+" séances · "+pct+"%"; }
 function renderToday(){
   const iso=todayISO(); const day=findDay(iso); const el=$("todaycard");
   if(!day){
     let nxt=null; for(const w of WEEKS){ for(const dd of arr(w && w.days)){ if(dd && dd.d>iso && dd.t!=='off'){ nxt=dd; break; } } if(nxt) break; }
-    el.innerHTML='<div class="today-card restday"><span class="tc-ico">🌙</span><div class="tc-main"><div class="tc-title">Hors plan</div><div class="tc-sub">'+(nxt?('Prochaine séance : '+frDate(nxt.d)):'Plan terminé — bravo !')+'</div></div></div>';
+    // Une activite un jour sans seance prevue s'affiche a SA date reelle :
+    // on ne devine jamais un decalage de seance.
+    el.innerHTML='<div class="today-card restday"><span class="tc-ico">🌙</span><div class="tc-main"><div class="tc-title">Hors plan</div><div class="tc-sub">'+(nxt?('Prochaine séance : '+frDate(nxt.d)):'Plan terminé — bravo !')+'</div>'+stravaTodayHTML(iso, null)+'</div></div>';
     return;
   }
-  const isDone=!!done[day.d]; const lg=log[day.d];
+  const dn=isDone(day.d); const lg=log[day.d];
   const ico=DAY_ICO[day.t]||'👟';
   let sub=esc(TYPE_LABEL[day.t]); if(day.km) sub+=' · ≈'+esc(day.km)+' km'; if(day.fc) sub+=' · FC '+esc(day.fc);
-  if(isDone) sub='✓ Faite'+(lg&&lg.feel?' '+esc(FEEL_EMO[lg.feel]):'');
+  if(dn) sub='✓ Faite'+(lg&&lg.feel?' '+esc(FEEL_EMO[lg.feel]):'');
   if(unsavedDays[day.d]) sub+=' · ⚠ non enregistré';
-  el.innerHTML='<button type="button" class="today-card'+(isDone?' done':'')+(day.t==='off'?' restday':'')+'"><span class="tc-ico">'+ico+'</span><div class="tc-main"><div class="tc-title">'+esc(day.title)+'</div><div class="tc-sub">'+sub+'</div></div><span class="tc-go">›</span></button>';
+  el.innerHTML='<button type="button" class="today-card'+(dn?' done':'')+(day.t==='off'?' restday':'')+'"><span class="tc-ico">'+ico+'</span><div class="tc-main"><div class="tc-title">'+esc(day.title)+'</div><div class="tc-sub">'+sub+'</div>'+stravaTodayHTML(iso, day)+'</div><span class="tc-go">›</span></button>';
   el.querySelector('.today-card').addEventListener('click', function(){ openSheet(day); });
 }
 function renderJournal(){
@@ -1493,7 +1557,7 @@ function stravaText(state){
   const http = d.status ? " (HTTP " + d.status + (d.code ? " · " + d.code : "") + ")" : "";
   switch(state){
     case "nokey":
-      return "Clé d'appareil requise — saisis-la ci-dessous, puis tape « Enregistrer la clé ».";
+      return "Clé d'appareil requise — saisis-la ci-dessous, puis tape « Enregistrer ».";
     case "badkey":
       return "Clé d'appareil refusée" + http + ". Vérifie qu'elle correspond exactement à APP_ACCESS_KEY dans les variables Netlify.";
     case "config":
@@ -1613,8 +1677,535 @@ try{
       return;
     }
     STRAVA_STATE = "off"; STRAVA_SINCE = "";
+    // Le cache d'activites est jetable : on le purge, il n'est plus a jour.
+    // Aucune donnee utilisateur n'est touchee.
+    try{ await stravaCacheClear(); }catch(e){}
+    try{ stravaRerender(); }catch(e){}
     renderStravaCard();
     stravaMsg("Strava déconnecté.", "ok");
+  });
+}catch(e){ /* la carte Strava ne doit jamais empecher l'app de demarrer */ }
+
+/* ======================================================================
+   STRAVA — etapes B2/B3 : activites, cache local, rapprochement prevu/realise.
+
+   TROIS REGLES NON NEGOCIABLES DE CE BLOC
+   1. Strava n'ECRIT JAMAIS dans tgcm-done / tgcm-log / tgcm-races. L'etat
+      « fait » est DERIVE (tgcm-done a 3 etats + activites du jour) et n'est
+      persiste que dans le cache jetable ci-dessous.
+   2. L'app DECRIT, elle ne JUGE pas : aucun « objectif atteint », aucun code
+      couleur vert/rouge sur l'ecart, aucun pourcentage d'accomplissement.
+      Le prevu et le realise s'affichent cote a cote, en neutre.
+   3. INVARIANT 4 : rien ici n'est sur le chemin de rendu. Aucun await reseau
+      avant un rendu, aucune exception qui remonte, aucune dependance au reseau
+      pour cocher une seance ou ecrire dans le journal.
+   ====================================================================== */
+/* Constantes et etat de ce module : DECLARES PLUS HAUT, avec l'etat de l'app
+   (voir « ETAT STRAVA » a cote de `let log = {}`). Ne pas les redescendre ici :
+   les declarations de fonction sont hoistees, pas les const/let. */
+
+/* ---------- lecture defensive du corps serveur -------------------------
+   Le serveur garantit 12 cles, mais TOUTES peuvent valoir null, et un corps
+   hostile reste possible : on ne recopie que ce qu'on sait typer. */
+function stravaNum(v){ return (typeof v === "number" && isFinite(v)) ? v : null; }
+function stravaStr(v){ return (typeof v === "string") ? v : null; }
+function stravaSanitize(a){
+  if(!isPlainObject(a)) return null;
+  return {
+    id: (typeof a.id === "number" || typeof a.id === "string") ? a.id : null,
+    name: stravaStr(a.name),                       // texte DISTANT : echappe a l'affichage
+    sport_type: stravaStr(a.sport_type),
+    type: stravaStr(a.type),
+    date: isISODate(a.date) ? a.date : null,
+    distance: stravaNum(a.distance),
+    elevation: stravaNum(a.elevation),
+    moving_time: stravaNum(a.moving_time),
+    elapsed_time: stravaNum(a.elapsed_time),
+    average_speed: stravaNum(a.average_speed),
+    average_heartrate: stravaNum(a.average_heartrate),
+    max_heartrate: stravaNum(a.max_heartrate)
+  };
+}
+function stravaSanitizeList(v){
+  return arr(v).map(stravaSanitize).filter(function(a){ return !!a; });
+}
+/* Index par date REELLE. Une activite sans date exploitable n'est rattachee a
+   aucun jour : on ne devine jamais un decalage de seance. */
+function stravaIndex(list){
+  const by = Object.create(null);
+  arr(list).forEach(function(a){
+    if(!a || !a.date) return;
+    if(!by[a.date]) by[a.date] = [];
+    by[a.date].push(a);
+  });
+  return by;
+}
+/* sport_type PRIORITAIRE sur type : un TrailRun doit remonter comme trail,
+   la distinction route/trail compte pour le suivi des tendons. */
+function stravaSport(a){
+  const s = a ? stravaStr(a.sport_type) : null;
+  if(s) return s;
+  const t = a ? stravaStr(a.type) : null;
+  return t || "";
+}
+function stravaSportLabel(a){
+  const s = stravaSport(a);
+  if(!s) return "Activité";
+  return Object.prototype.hasOwnProperty.call(STRAVA_SPORT_LABEL, s) ? STRAVA_SPORT_LABEL[s] : s;
+}
+function stravaQualifies(a){ return STRAVA_DONE_TYPES.indexOf(stravaSport(a)) > -1; }
+function stravaDayActs(iso){
+  if(!STRAVA_ACTS || !STRAVA_ACTS.byDay || !iso) return [];
+  const l = STRAVA_ACTS.byDay[iso];
+  return Array.isArray(l) ? l : [];
+}
+function stravaDayQualifies(iso){ return stravaDayActs(iso).some(stravaQualifies); }
+
+/* ---------- ETAT « FAIT » : source unique -----------------------------
+   tgcm-done a TROIS etats : true = fait (decision manuelle), false =
+   explicitement pas fait, cle absente = pas d'avis.
+   Toute lecture booleenne de done[...] passe par isDone(). */
+/* Un jour de REPOS ne se coche JAMAIS tout seul, quel que soit le type
+   d'activite. `off` n'est pas une seance — allSessions() l'a toujours exclu
+   du decompte — et afficher « fait » sur un jour de repos reviendrait a
+   valider a la place d'Enzo une sortie non prevue. Avec trois tendinopathies
+   actives, ce n'est pas le role de l'app.
+   Les FAITS, eux, s'affichent normalement : il a couru, l'app le montre, sans
+   un mot, une couleur ni une icone d'appreciation.
+   La coche MANUELLE reste possible sur un jour off, et prime comme toujours.
+   Un jour hors plan n'a pas davantage de seance a cocher. */
+function stravaAutoEligible(iso){
+  const d = findDay(iso);
+  return !!d && d.t !== "off";
+}
+function stravaAutoQualifies(iso){ return stravaAutoEligible(iso) && stravaDayQualifies(iso); }
+function isDone(iso){
+  if(done[iso] === false) return false;   // decision explicite : elle prime sur Strava
+  if(done[iso]) return true;              // decision manuelle (true, ou valeur heritee truthy)
+  return stravaAutoQualifies(iso);        // sinon : derive des activites d'un jour de SEANCE
+}
+/* Coche AUTOMATIQUE : sert a distinguer visuellement une validation manuelle
+   d'une deduction Strava. Sans cette distinction, impossible de savoir dans
+   trois mois ce qui a ete confirme a la main. */
+function stravaAutoDone(iso){
+  return !done[iso] && done[iso] !== false && stravaAutoQualifies(iso);
+}
+
+/* ---------- agregation d'un jour -------------------------------------- */
+function stravaSum(list, key){
+  let s = null;
+  arr(list).forEach(function(a){
+    const v = a ? stravaNum(a[key]) : null;
+    if(v !== null) s = (s === null) ? v : s + v;
+  });
+  return s;
+}
+/* Allure calculee a partir des TOTAUX, jamais une moyenne d'allures.
+   Garde-fous : null, division par zero, resultat absurde. */
+function stravaPaceSec(distM, movingS, fallbackSpeed){
+  let p = null;
+  if(distM !== null && distM > 0 && movingS !== null && movingS > 0) p = movingS / (distM / 1000);
+  else if(fallbackSpeed !== null && fallbackSpeed > 0) p = 1000 / fallbackSpeed;
+  if(p === null || !isFinite(p) || p <= 0 || p > 36000) return null;
+  return p;
+}
+function stravaAgg(list){
+  const l = arr(list);
+  const dist = stravaSum(l, "distance");
+  const mov  = stravaSum(l, "moving_time");
+  let hrMax = null, wTime = 0, wHr = 0;
+  l.forEach(function(a){
+    const mx = a ? stravaNum(a.max_heartrate) : null;
+    if(mx !== null) hrMax = (hrMax === null) ? mx : Math.max(hrMax, mx);
+    const hr = a ? stravaNum(a.average_heartrate) : null;
+    const t  = a ? stravaNum(a.moving_time) : null;
+    if(hr !== null && t !== null && t > 0){ wTime += t; wHr += hr * t; }   // FC PONDEREE par le temps
+  });
+  /* COUVERTURE — additionner la distance de TOUTES les activites et la diviser
+     par le temps de CERTAINES produit une allure physiquement impossible.
+     On ne calcule une allure agregee que si le temps couvre TOUTE la distance
+     additionnee ; sinon on n'affiche pas d'allure du tout. L'absence est
+     honnete, un chiffre faux ne l'est pas. Meme regle pour la FC ponderee.
+     Les autres faits (distance, D+, temps, FC max) restent affiches. */
+  const couvrePace = l.length > 0 && l.every(function(a){
+    const d = a ? stravaNum(a.distance) : null, t = a ? stravaNum(a.moving_time) : null;
+    return d !== null && d > 0 && t !== null && t > 0;
+  });
+  const couvreHr = l.length > 0 && l.every(function(a){
+    const h = a ? stravaNum(a.average_heartrate) : null, t = a ? stravaNum(a.moving_time) : null;
+    return h !== null && t !== null && t > 0;
+  });
+  // Une seule activite : aucun probleme de couverture possible. On peut se
+  // rabattre sur les moyennes que Strava fournit pour cette activite-la.
+  const seule = (l.length === 1 && l[0]) ? l[0] : null;
+  return {
+    n: l.length,
+    distance: dist,
+    elevation: stravaSum(l, "elevation"),
+    moving: mov,
+    elapsed: stravaSum(l, "elapsed_time"),
+    pace: couvrePace ? stravaPaceSec(dist, mov, null)
+                     : (seule ? stravaPaceSec(null, null, stravaNum(seule.average_speed)) : null),
+    hrAvg: couvreHr ? (wHr / wTime)
+                    : (seule ? stravaNum(seule.average_heartrate) : null),
+    hrMax: hrMax
+  };
+}
+
+/* ---------- formats. Un champ null ne produit AUCUN element :
+   ni « null », ni « — », ni zero invente. ------------------------------- */
+/* Une valeur non finie ou negative est une valeur ABSENTE : elle ne
+   s'affiche pas. Meme regime que stravaDur / stravaPaceTxt / stravaHr. */
+function stravaKm(m){ return (m === null || m === undefined || !isFinite(m) || m < 0) ? "" : (m / 1000).toFixed(1).replace(".", ",") + " km"; }
+function stravaDplus(m){ return (m === null || m === undefined || !isFinite(m) || m < 0) ? "" : Math.round(m) + " m D+"; }
+function stravaDur(s){
+  if(s === null || s === undefined || !isFinite(s) || s < 0) return "";
+  const t = Math.round(s), h = Math.floor(t / 3600);
+  const m = Math.round((t - h * 3600) / 60);
+  if(m === 60) return (h + 1) + " h 00";
+  if(h > 0) return h + " h " + String(m).padStart(2, "0");
+  return m + " min";
+}
+function stravaPaceTxt(sec){
+  if(sec === null || sec === undefined || !isFinite(sec)) return "";
+  const t = Math.round(sec), m = Math.floor(t / 60), s = t % 60;
+  return m + ":" + String(s).padStart(2, "0") + "/km";
+}
+function stravaHr(v){ return (v === null || v === undefined || !isFinite(v) || v <= 0) ? "" : Math.round(v) + " bpm"; }
+function stravaFacts(g){
+  const out = [];
+  const d = stravaKm(g.distance);      if(d)  out.push(d);
+  const e = stravaDplus(g.elevation);  if(e)  out.push(e);
+  const t = stravaDur(g.moving);       if(t)  out.push(t);
+  const p = stravaPaceTxt(g.pace);     if(p)  out.push(p);
+  const h = stravaHr(g.hrAvg);         if(h)  out.push("♥ " + h);
+  const x = stravaHr(g.hrMax);         if(x)  out.push("max " + x);
+  return out;
+}
+/* Ecart prevu/realise : cote a cote, en NEUTRE. Aucun mot, aucune couleur et
+   aucune icone ne doit qualifier cet ecart — c'est le role d'Enzo et de son
+   coach, pas celui de l'app. */
+function stravaVsPlan(day, g){
+  const km = (day && typeof day.km === "number" && isFinite(day.km) && day.km > 0) ? day.km : null;
+  const real = stravaKm(g.distance);
+  if(km === null || !real) return "";
+  return "≈ " + esc(String(km)) + " km prévu → " + esc(real) + " réalisé";
+}
+
+/* ---------- rendus ----------------------------------------------------- */
+function stravaChipHTML(iso){
+  return stravaAutoDone(iso) ? '<span class="chip strava">✓ Strava</span>' : "";
+}
+/* Bloc compact de la carte du jour. Tout texte distant est echappe. */
+function stravaTodayHTML(iso, day){
+  const list = stravaDayActs(iso);
+  if(!list.length) return "";
+  const g = stravaAgg(list);
+  const bits = [stravaAutoDone(iso) ? "✓ Strava" : "Strava"];
+  if(g.n === 1) bits.push(esc(stravaSportLabel(list[0])));
+  stravaFacts(g).forEach(function(f){ bits.push(esc(f)); });
+  let h = '<div class="tc-real">' + bits.join(" · ");
+  if(g.n > 1) h += '<span class="sm"> · ' + g.n + ' activités additionnées</span>';
+  const vs = stravaVsPlan(day, g);
+  if(vs) h += '<span class="sm"><br>' + vs + '</span>';
+  return h + '</div>';
+}
+/* Section de la fiche de seance : le detail, activite par activite. */
+function stravaSheetHTML(day){
+  const iso = day ? day.d : "";
+  const list = stravaDayActs(iso);
+  if(!list.length) return "";
+  const g = stravaAgg(list);
+  let h = '<div class="sec"><h3>Réalisé · Strava</h3>';
+  if(stravaAutoDone(iso)){
+    h += '<p class="strava-line"><span class="chip strava">✓ Strava</span> '
+      +  '<span class="sm">séance cochée d\'après l\'activité du jour, pas à la main</span></p>';
+  }
+  if(g.n > 1){
+    const tot = stravaFacts(g).map(esc);
+    h += '<p class="strava-line">Total · ' + g.n + ' activités additionnées'
+      +  (tot.length ? ' · ' + tot.join(" · ") : "") + '</p>';
+  }
+  list.forEach(function(a){
+    const bits = stravaFacts(stravaAgg([a])).map(esc);
+    const nm = (a.name && a.name.trim()) ? esc(a.name) : "Activité sans nom";
+    h += '<div class="strava-act"><b>' + nm + '</b> · ' + esc(stravaSportLabel(a))
+      +  (bits.length ? ' · ' + bits.join(" · ") : "") + '</div>';
+  });
+  const vs = stravaVsPlan(day, g);
+  if(vs) h += '<p class="strava-line">' + vs + '</p>';
+  // Sur un jour de repos, aucune de ces deux notes ne s'affiche : l'app ne
+  // commente pas une sortie non prevue, elle se contente de la decrire.
+  if(stravaAutoEligible(iso)){
+    if(!stravaDayQualifies(iso)) h += '<p class="strava-line"><span class="sm">Ce type d\'activité ne coche pas la séance.</span></p>';
+    else if(done[iso] === false) h += '<p class="strava-line"><span class="sm">Séance décochée à la main.</span></p>';
+  }
+  return h + '</div>';
+}
+function stravaWhen(ts){
+  const d = new Date(ts);
+  if(!isFinite(d.getTime())) return "";
+  const p = function(n){ return String(n).padStart(2, "0"); };
+  // Sans l'annee, un cache d'il y a deux ans et un cache d'aujourd'hui
+  // s'affichent a l'identique. On l'ajoute des que l'annee differe.
+  const an = d.getFullYear(), courante = new Date().getFullYear();
+  return p(d.getDate()) + "/" + p(d.getMonth() + 1) + (an === courante ? "" : "/" + an)
+    + " à " + d.getHours() + " h " + p(d.getMinutes());
+}
+/* Age du cache, en ms. BORNE DES DEUX COTES.
+   Si l'horloge de l'iPhone avance momentanement (synchro reseau, changement de
+   fuseau), le cache garde un horodatage futur : `Date.now() - at` devient negatif,
+   donc eternellement inferieur au TTL, donc plus JAMAIS de synchro automatique.
+   Un age negatif n'est pas « frais » : c'est un cache suspect. */
+function stravaCacheAge(){
+  if(!STRAVA_ACTS) return null;
+  const at = stravaNum(STRAVA_ACTS.at);
+  return (at === null) ? null : (Date.now() - at);
+}
+/* Horodatage franchement posterieur a l'heure de l'appareil : on refuse de
+   dater quoi que ce soit de demain. La tolerance absorbe la derive normale. */
+function stravaCacheSuspect(){
+  const a = stravaCacheAge();
+  return a !== null && a < -STRAVA_CLOCK_SKEW_MS;
+}
+function stravaCacheFresh(){
+  const a = stravaCacheAge();
+  return a !== null && a >= 0 && a < STRAVA_TTL_MS;
+}
+/* UNE seule source pour UNE seule question : « suis-je connecte a Strava ? ».
+   C'est le dernier appel serveur qui fait foi (auth-status OU activities), pas
+   ce que le cache portait le jour ou il a ete ecrit — sans quoi la carte de
+   connexion et la ligne de synchro peuvent se contredire a l'ecran. */
+function stravaConnecte(){
+  if(STRAVA_STATE === "on")  return true;
+  if(STRAVA_STATE === "off") return false;
+  return !!(STRAVA_ACTS && STRAVA_ACTS.connected);   // aucun etat serveur connu : on s'en remet au cache
+}
+/* Completude, source UNIQUE : true = complet, false = incomplet,
+   null = INDETERMINE. Le serveur garantit truncated === (stop !== 'complete'),
+   mais le client ne parie pas dessus : on croise les deux, le doute l'emporte,
+   et un `stop` absent ou inconnu n'est JAMAIS pris pour un succes complet. */
+function stravaComplet(c){
+  if(!c) return null;
+  if(c.truncated === true) return false;          // dit tronque : c'est tronque, meme si stop dit 'complete'
+  if(c.stop === "complete") return true;
+  if(c.stop === "page_limit" || c.stop === "budget" || c.stop === "error") return false;
+  return null;                                    // stop absent ou inconnu : on ne conclut rien
+}
+/* `count` peut valoir 0 avec stop:'budget' : le temps a manque, ce n'est PAS
+   « aucune sortie ». On ne conclut JAMAIS sans avoir lu la completude. */
+function stravaCountText(){
+  const c = STRAVA_ACTS;
+  if(!c) return "Aucune donnée sur cet appareil";
+  if(!stravaConnecte()) return "Strava n'est pas connecté";
+  const tout = arr(c.acts);
+  // Une activite sans date exploitable est conservee, mais elle n'est
+  // rattachable a aucun jour : la compter sans le dire serait mentir par omission.
+  const sans = tout.filter(function(a){ return !(a && a.date); }).length;
+  const n = tout.length;
+  if(n){
+    return n + " activité" + (n > 1 ? "s" : "") + " récupérée" + (n > 1 ? "s" : "")
+      + (sans ? " — dont " + sans + " sans date exploitable, non rattachée" + (sans > 1 ? "s" : "") + " à un jour" : "");
+  }
+  const etat = stravaComplet(c);
+  if(etat === true)  return "Aucune activité sur les " + c.days + " derniers jours";
+  if(etat === false) return "Récupération incomplète — aucune activité obtenue";
+  return "Aucune activité obtenue";               // indetermine : aucune conclusion
+}
+function stravaStopNote(c){
+  if(!c || !stravaConnecte()) return "";
+  const etat = stravaComplet(c);
+  if(etat === true) return "";
+  if(etat === null) return " Rien n'indique que la liste soit complète.";
+  switch(c.stop){
+    case "page_limit": return " Arrêt avant la fin (limite de pages) : la liste est incomplète.";
+    case "budget":     return " Arrêt avant la fin (temps imparti) : la liste est incomplète.";
+    case "error":      return " Récupération interrompue par une erreur : la liste est incomplète.";
+    default:           return " La liste est incomplète.";
+  }
+}
+function renderStravaSync(){
+  const el = $("stravasyncinfo"); if(!el) return;
+  let t = "";
+  if(stravaSyncing) t = "Synchronisation en cours…";
+  else if(!STRAVA_ACTS) t = "Aucune activité récupérée sur cet appareil pour l'instant.";
+  else {
+    // Perime : on l'affiche quand meme, DATE. Du perime date vaut mieux que du vide.
+    // Horodatage futur : les donnees restent affichees, mais on ne pretend pas
+    // les dater — l'horloge de l'appareil est en cause, pas les donnees.
+    t = (stravaCacheSuspect()
+          ? "Données enregistrées, horodatage postérieur à l'heure de l'appareil — date non affichée"
+          : "Données du " + stravaWhen(STRAVA_ACTS.at) + (stravaCacheFresh() ? "" : " — à rafraîchir"))
+      + " · " + stravaCountText() + "." + stravaStopNote(STRAVA_ACTS);
+  }
+  if(STRAVA_SYNC_ERR) t += (t ? " " : "") + STRAVA_SYNC_ERR;
+  el.textContent = t;
+  el.classList.toggle("hidden", !t);
+}
+/* Rendu des vues qui DERIVENT des activites. Aucune ecriture nulle part. */
+function stravaRerender(){
+  try{ renderWeek(); }catch(e){}
+  try{ renderToday(); }catch(e){}
+  try{ renderProgress(); }catch(e){}
+  try{ renderStravaSync(); }catch(e){}
+}
+
+/* ---------- cache local ------------------------------------------------
+   Ce n'est PAS une cle utilisateur : sset/sget, jamais saveUser(). Un echec
+   d'ecriture est benin — pas de bandeau, au pire un silence. */
+async function stravaCacheSave(){
+  if(!STRAVA_ACTS) return false;
+  try{
+    return await sset(STRAVA_CACHE_KEY, {
+      v: STRAVA_CACHE_V, at: STRAVA_ACTS.at, connected: STRAVA_ACTS.connected,
+      days: STRAVA_ACTS.days, count: STRAVA_ACTS.count, truncated: STRAVA_ACTS.truncated,
+      partial: STRAVA_ACTS.partial, stop: STRAVA_ACTS.stop, acts: STRAVA_ACTS.acts
+    });
+  }catch(e){ return false; }
+}
+async function stravaCacheLoad(){
+  let c = null;
+  try{ c = await sget(STRAVA_CACHE_KEY, null); }catch(e){ return null; }
+  // Schema different (ou corps inattendu) : ignore PROPREMENT, jamais interprete.
+  if(!isPlainObject(c) || c.v !== STRAVA_CACHE_V) return null;
+  const at = stravaNum(c.at);
+  if(at === null) return null;
+  const acts = stravaSanitizeList(c.acts);
+  const days = stravaNum(c.days);
+  const count = stravaNum(c.count);
+  return {
+    at: at, connected: c.connected === true, days: (days === null ? STRAVA_DAYS : days),
+    count: (count === null ? acts.length : count), truncated: c.truncated === true,
+    partial: c.partial === true, stop: (typeof c.stop === "string") ? c.stop : "",
+    acts: acts, byDay: stravaIndex(acts)
+  };
+}
+async function stravaCacheClear(){
+  STRAVA_ACTS = null;
+  try{ await sdel(STRAVA_CACHE_KEY); }catch(e){}
+}
+
+/* ---------- reseau ----------------------------------------------------- */
+function stravaIsReauth(r){
+  if(!r || r.status !== 409) return false;
+  const b = isPlainObject(r.body) ? r.body : null;
+  const why = b ? b.reason : "";
+  return why === "reauth" || why === "token_lost";
+}
+function stravaWait(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+/* Table d'erreurs du contrat serveur. Aucun code ne doit produire un ecran
+   vide, un plantage, ni un message technique brut sans explication. */
+function stravaActsMsg(r){
+  if(!r) return "Synchronisation impossible.";
+  if(r.reason === "nokey")   return "Clé d'appareil requise pour synchroniser.";
+  if(r.reason === "timeout") return "Le serveur n'a pas répondu en " + (STRAVA_TIMEOUT / 1000) + " s. Réessaie.";
+  if(r.reason === "network") return "Serveur injoignable — hors-ligne ? L'app fonctionne normalement sans Strava.";
+  const b = isPlainObject(r.body) ? r.body : null;
+  const err = (b && typeof b.error === "string") ? b.error : "";
+  const why = (b && typeof b.reason === "string") ? b.reason : "";
+  const http = " (HTTP " + (r.status || 0) + (err ? " · " + err + (why ? ":" + why : "") : "") + ")";
+  if(r.status === 401) return "Clé d'appareil refusée" + http + ". Vérifie APP_ACCESS_KEY.";
+  if(r.status === 405) return "Requête refusée par le serveur" + http + ".";
+  if(r.status === 409) return "Connexion Strava à renouveler" + http + ".";
+  if(r.status === 429) return "Quota Strava atteint — réessaie plus tard" + http + ".";
+  if(r.status === 502) return "Strava a répondu de façon inattendue — réessaie plus tard" + http + ".";
+  if(r.status === 504) return "Strava n'a pas répondu à temps — réessaie" + http + ".";
+  if(r.status === 503){
+    if(err === "blobs") return "Stockage serveur indisponible" + http + "." + stravaStoreHint(err + ":" + why);
+    return "Service indisponible — réessaie plus tard" + http + ".";
+  }
+  if(r.status === 500 && err === "config"){
+    const miss = arr(b && b.missing).filter(function(x){ return typeof x === "string"; });
+    return "Configuration serveur incomplète" + http
+      + (miss.length ? " — variables manquantes : " + miss.join(", ") : "") + ".";
+  }
+  if(r.status === 500) return "Erreur serveur" + http + ". Réessaie plus tard.";
+  return "Réponse inattendue du serveur" + http + ".";
+}
+/* CONTRAINTE DURE : jamais deux appels `activities` en parallele. Le serveur
+   n'a pas de verrou et deux rafraichissements simultanes peuvent invalider le
+   jeton. Toute demande concurrente est IGNOREE (pas mise en file).
+   Ne LEVE JAMAIS : renvoie "ok" | "busy" | "reauth" | "error". */
+async function stravaSync(manual){
+  if(stravaSyncing) return "busy";
+  stravaSyncing = true;
+  STRAVA_SYNC_ERR = "";
+  try{ renderStravaSync(); }catch(e){}
+  try{
+    let r = await stravaCall("activities?days=" + STRAVA_DAYS, "GET");
+    // Un reauth sur UN SEUL appel peut n'etre qu'une collision : on CONFIRME
+    // par un second appel avant de demander a Enzo de reconnecter Strava.
+    if(stravaIsReauth(r)){
+      await stravaWait(STRAVA_REAUTH_RETRY_MS);
+      const r2 = await stravaCall("activities?days=" + STRAVA_DAYS, "GET");
+      if(stravaIsReauth(r2)){
+        STRAVA_SYNC_ERR = "Connexion Strava à renouveler : tape « Connecter Strava » pour réautoriser.";
+        return "reauth";
+      }
+      r = r2;
+    }
+    if(!r || !r.ok){ STRAVA_SYNC_ERR = stravaActsMsg(r); return "error"; }
+    const b = isPlainObject(r.body) ? r.body : null;
+    if(!b || typeof b.connected !== "boolean"){
+      STRAVA_SYNC_ERR = "Réponse inattendue du serveur (corps illisible).";
+      return "error";
+    }
+    const acts = stravaSanitizeList(b.activities);   // `activities` non-tableau -> []
+    const days = stravaNum(b.days), count = stravaNum(b.count);
+    STRAVA_ACTS = {
+      at: Date.now(), connected: b.connected === true,
+      days: (days === null ? STRAVA_DAYS : days),
+      count: (count === null ? acts.length : count),
+      truncated: b.truncated === true, partial: b.partial === true,
+      stop: (typeof b.stop === "string") ? b.stop : "",
+      acts: acts, byDay: stravaIndex(acts)
+    };
+    await stravaCacheSave();
+    // Meme serveur, meme verite : ce que `activities` vient de repondre fait foi
+    // pour l'etat affiche par la carte Strava. Sans ca, #stravainfo pouvait
+    // annoncer « Connecté depuis le ... » pendant que #stravasyncinfo disait
+    // « Strava n'est pas connecté ».
+    if(STRAVA_STATE !== (b.connected ? "on" : "off")){
+      STRAVA_STATE = b.connected ? "on" : "off";
+      if(!b.connected) STRAVA_SINCE = "";
+      try{ renderStravaCard(); }catch(e){}
+    }
+    return "ok";
+  }catch(e){
+    STRAVA_SYNC_ERR = "Synchronisation interrompue.";
+    return "error";
+  }finally{
+    stravaSyncing = false;
+    // Seul appel du module qui n'etait pas enveloppe. Le contrat de stravaSync
+    // est « ne leve jamais » et le bouton l'attend sans catch : meme regime que
+    // les trois autres.
+    try{ stravaRerender(); }catch(e){}
+  }
+}
+/* Synchro d'ouverture : JAMAIS bloquante, jamais awaitee par le demarrage.
+   Conditions : cle d'appareil presente, en ligne, cache absent ou perime.
+   Sans cle d'appareil, AUCUN appel reseau n'est emis. */
+function stravaAutoSync(){
+  try{
+    if(stravaAutoTried) return;
+    stravaAutoTried = true;
+    if(typeof navigator !== "undefined" && navigator && navigator.onLine === false) return;
+    if(stravaCacheFresh()) return;      // cache frais : aucun appel reseau
+    stravaGetKey().then(function(k){
+      if(!k) return;                    // pas de cle d'appareil : aucun appel du tout
+      return stravaSync(false);
+    }).catch(function(){});
+  }catch(e){}
+}
+
+try{
+  $("stravasync").addEventListener("click", async function(){
+    if(stravaSyncing){ toast("Synchronisation déjà en cours"); return; }
+    stravaProbed = true;
+    const res = await stravaSync(true);
+    if(res === "busy") toast("Synchronisation déjà en cours");
+    else if(res === "ok") toast(stravaCountText() + " ✓", 4000);
+    else toast(STRAVA_SYNC_ERR || "Synchronisation impossible", 6000);
   });
 }catch(e){ /* la carte Strava ne doit jamais empecher l'app de demarrer */ }
 
@@ -1630,6 +2221,7 @@ const pages = {plan:$("page-plan"), races:$("page-races"), journal:$("page-journ
       stravaProbed = true;
       try{ stravaRefresh(); }catch(e){}
     }
+    if(t==="zones"){ try{ renderStravaSync(); }catch(e){} }
     window.scrollTo(0,0);
   });
 });
@@ -1765,6 +2357,10 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
     if(!Array.isArray(r0)) readFailed["tgcm-races"] = true;
     if(!isPlainObject(l0)) readFailed["tgcm-log"]   = true;
     noteReadFailures();
+    // Cache Strava : lecture LOCALE (jamais reseau) avant le premier rendu, pour
+    // que les coches deduites soient la des l'ouverture, sans clignotement.
+    // Ce n'est PAS une cle utilisateur : un echec est benin et silencieux.
+    try{ STRAVA_ACTS = await stravaCacheLoad(); }catch(e){ STRAVA_ACTS = null; }
     // Sonde d'ecriture sur une cle JETABLE (`tgcm-probe`) : previent Enzo si le
     // stockage est plein / en navigation privee AVANT toute perte, sans jamais
     // toucher a tgcm-done / tgcm-log / tgcm-races.
@@ -1774,6 +2370,10 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
     // Filet de derniere instance : jamais d'ecran fige sur « Chargement du plan… ».
     try{ failToPlanError((e && e.message) || String(e)); }catch(_){}
   }
+  // Synchro Strava d'ouverture : HORS du chemin de rendu, jamais awaitee ici,
+  // et sans le moindre appel reseau si aucune cle d'appareil n'est enregistree.
+  try{ stravaAutoSync(); }catch(e){}
+  try{ renderStravaSync(); }catch(e){}
 })();
 
 /* Retour de auth-callback : purement local (aucun appel reseau), entierement
