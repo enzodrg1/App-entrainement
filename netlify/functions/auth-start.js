@@ -3,10 +3,14 @@
    auth-start — prepare la connexion Strava.
 
    Ne renvoie PAS de 302 : une navigation de redirection ne peut pas porter
-   d'en-tete, et faire transiter la cle d'appareil en parametre d'URL la
+   d'en-tete, et faire transiter la cle d'acces en parametre d'URL la
    ferait fuir dans les journaux, l'historique et le Referer.
    Le client appelle donc cette fonction en POST avec l'en-tete x-app-key,
    recoit { url }, et ouvre lui-meme cette URL.
+
+   MULTI-PROFILS : le nonce est range sous le profil AUTHENTIFIE et le
+   state est signe avec le secret de ce profil. Aucun identifiant de profil
+   n'est lu dans la requete.
    ===================================================================== */
 const crypto = require('crypto');
 const C = require('./lib/common.js');
@@ -19,9 +23,10 @@ exports.handler = async function (event) {
     if (method === 'OPTIONS') return C.preflight(ALLOWED);
     if (method !== 'POST') return C.methodNotAllowed(ALLOWED);
 
-    const denied = C.checkKey(event);
-    if (denied) return denied;
-    // A partir d'ici, l'appelant est authentifie.
+    const auth = await C.checkKey(event);
+    if (auth.denied) return auth.denied;
+    const profile = auth.profile;
+    // A partir d'ici, l'appelant est authentifie et son profil est connu.
 
     const clientId = C.env('STRAVA_CLIENT_ID');
     const origin = C.siteOrigin();
@@ -35,12 +40,30 @@ exports.handler = async function (event) {
     const nonce = crypto.randomBytes(18).toString('hex');
     const exp = Date.now() + C.STATE_TTL_MS;
     try {
-      await C.putNonce(event, nonce, exp);
+      await C.putNonce(event, profile.id, nonce, exp);
     } catch (e) {
       return C.storeFailure(e);
     }
 
-    const state = C.signState(C.accessKey(), nonce, exp);
+    /* Purge opportuniste des nonces que ce profil a abandonnes : ouvrir
+       « Connecter Strava » sans aller au bout laissait sinon une trace
+       definitive, et la croissance etait monotone.
+       APRES putNonce, et jamais avant : l'ecriture du nonce est le travail
+       utile de cette fonction, la purge n'est qu'un entretien. Elle est
+       bornee en entrees, en suppressions et en temps (voir common.js) et
+       ne leve jamais -- le try n'est qu'une ceinture supplementaire.
+       UNE PURGE EN ECHEC NE DOIT JAMAIS EMPECHER UNE CONNEXION : aucun
+       chemin ne sort d'ici avec autre chose que l'URL attendue. */
+    try {
+      const swept = await C.sweepExpiredNonces(event, profile.id);
+      if (swept.deleted || swept.halted) {
+        // Des NOMBRES et des booleens : jamais une cle de stockage.
+        console.log('[strava] purge des nonces | examines :', swept.scanned,
+          '| supprimes :', swept.deleted, '| interrompue :', swept.halted ? 'oui' : 'non');
+      }
+    } catch (e) { /* sans consequence, par construction */ }
+
+    const state = C.signState(profile, nonce, exp);
     const redirectUri = origin + '/.netlify/functions/auth-callback';
     const url = 'https://www.strava.com/oauth/authorize'
       + '?client_id=' + encodeURIComponent(clientId)

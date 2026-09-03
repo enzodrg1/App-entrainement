@@ -1,7 +1,8 @@
 'use strict';
 /* =====================================================================
-   auth-logout — supprime le token stocke cote serveur.
-   Protege par la cle d'appareil, comme auth-start et auth-status.
+   auth-logout — supprime le token stocke cote serveur POUR LE PROFIL
+   authentifie, et lui seul.
+   Protege par la cle d'acces, comme auth-start et auth-status.
    ===================================================================== */
 const C = require('./lib/common.js');
 
@@ -13,11 +14,11 @@ exports.handler = async function (event) {
     if (method === 'OPTIONS') return C.preflight(ALLOWED);
     if (method !== 'POST') return C.methodNotAllowed(ALLOWED);
 
-    const denied = C.checkKey(event);
-    if (denied) return denied;
+    const auth = await C.checkKey(event);
+    if (auth.denied) return auth.denied;
 
     try {
-      await C.deleteToken(event);
+      await C.deleteToken(event, auth.profile.id);
     } catch (e) {
       return C.storeFailure(e);
     }

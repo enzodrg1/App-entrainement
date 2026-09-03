@@ -14,10 +14,12 @@ exports.handler = async function (event) {
     if (method === 'OPTIONS') return C.preflight(ALLOWED);
     if (method !== 'GET') return C.methodNotAllowed(ALLOWED);
 
-    const denied = C.checkKey(event);
-    if (denied) return denied;
+    const auth = await C.checkKey(event);
+    if (auth.denied) return auth.denied;
+    const profile = auth.profile;
     // A partir d'ici l'appelant est authentifie : le detail de diagnostic
-    // qui suit n'est jamais visible d'un inconnu.
+    // qui suit n'est jamais visible d'un inconnu. Seul l'etat DE SON PROFIL
+    // est lu -- aucun autre espace n'est accessible depuis ici.
 
     // Aligne sur auth-start : une configuration incomplete se dit, elle ne
     // se deguise pas en « service indisponible ».
@@ -29,7 +31,7 @@ exports.handler = async function (event) {
 
     let token = null;
     try {
-      token = await C.readToken(event);
+      token = await C.readToken(event, profile.id);
     } catch (e) {
       // 'unconfigured' = Blobs non provisionne ; 'io' = lecture en echec.
       return C.storeFailure(e);

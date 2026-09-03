@@ -373,12 +373,12 @@ input.io::placeholder{color:var(--dim)}
   <div class="card">
     <h3>🔗 Strava</h3>
     <p class="note" id="stravainfo" style="margin-top:0">État non vérifié.</p>
-    <input class="io" type="password" id="stravakey" placeholder="Clé d'appareil" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Clé d'appareil">
+    <input class="io" type="password" id="stravakey" placeholder="Clé d'appareil — profil.clé" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Clé d'appareil, au format profil point clé">
     <div class="frow wrap" style="margin-top:8px"><button class="btn ghost" id="stravasave" type="button">Enregistrer</button><button class="btn ghost" id="stravacheck" type="button">Vérifier</button><button class="btn ghost" id="stravasync" type="button">Synchroniser</button></div>
     <div class="frow"><button class="btn ghost" id="stravaconnect" type="button">Connecter Strava</button><button class="btn ghost" id="stravalogout" type="button">Déconnecter</button></div>
     <div class="note plan-msg hidden" id="stravamsg"></div>
     <p class="note hidden" id="stravasyncinfo"></p>
-    <p class="note">Ce site est public : la <b>clé d'appareil</b> est ce qui empêche un inconnu de lire tes sorties ou de détourner la connexion. Génère-la toi-même, déclare-la dans les variables Netlify sous <b>APP_ACCESS_KEY</b>, puis saisis-la ici une fois. Elle reste sur cet appareil et <b>n'est jamais incluse dans l'export de sauvegarde</b>.</p>
+    <p class="note">Ce site est public : la <b>clé d'appareil</b> est ce qui empêche un inconnu de lire tes sorties ou de détourner la connexion. Elle t'est <b>fournie par Enzo</b>, au format <b>profil.clé</b> : la partie avant le point est ton profil, c'est elle qui dit au serveur à quelles données tu as accès — et à aucune autre. Saisis-la ici une fois : elle reste sur cet appareil et <b>n'est jamais incluse dans l'export de sauvegarde</b>. Perdue, elle ne se retrouve pas : Enzo en régénère une, sans rien effacer de tes données.</p>
     <p class="note">La synchronisation est un bonus : l'app fonctionne exactement pareil sans Strava, y compris hors-ligne.</p>
   </div>
 </section>
@@ -1970,7 +1970,7 @@ function stravaText(state){
     case "nokey":
       return "Clé d'appareil requise — saisis-la ci-dessous, puis tape « Enregistrer ».";
     case "badkey":
-      return "Clé d'appareil refusée" + http + ". Vérifie qu'elle correspond exactement à APP_ACCESS_KEY dans les variables Netlify.";
+      return "Clé d'appareil refusée" + http + ". Ressaisis la clé complète fournie par Enzo, au format profil.clé. Si elle a été régénérée, l'ancienne ne fonctionne plus.";
     case "config":
       return "Configuration serveur incomplète" + http
         + (d.missing.length ? " — variables manquantes : " + d.missing.join(", ") : "")
@@ -2029,7 +2029,7 @@ async function stravaRefresh(){
 try{
   $("stravasave").addEventListener("click", async function(){
     const v = ($("stravakey").value || "").trim();
-    if(!v){ stravaMsg("Saisis d'abord ta clé d'appareil.", "err"); return; }
+    if(!v){ stravaMsg("Saisis d'abord ta clé d'appareil, au format profil.clé.", "err"); return; }
     STRAVA_KEY = v;
     const okSave = await sset("strava-key", v);
     $("stravakey").value = "";
@@ -2522,7 +2522,7 @@ function stravaActsMsg(r){
   const err = (b && typeof b.error === "string") ? b.error : "";
   const why = (b && typeof b.reason === "string") ? b.reason : "";
   const http = " (HTTP " + (r.status || 0) + (err ? " · " + err + (why ? ":" + why : "") : "") + ")";
-  if(r.status === 401) return "Clé d'appareil refusée" + http + ". Vérifie APP_ACCESS_KEY.";
+  if(r.status === 401) return "Clé d'appareil refusée" + http + ". Ressaisis la clé complète fournie par Enzo.";
   if(r.status === 405) return "Requête refusée par le serveur" + http + ".";
   if(r.status === 409) return "Connexion Strava à renouveler" + http + ".";
   if(r.status === 429) return "Quota Strava atteint — réessaie plus tard" + http + ".";

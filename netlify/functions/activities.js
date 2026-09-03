@@ -10,7 +10,7 @@
    CONTRAT DE REPONSE (le client B2/B3 est ecrit contre lui : stable)
    ---------------------------------------------------------------------
    204  (pas de corps)            reponse au preflight OPTIONS. Le preflight
-        n'exige PAS la cle d'appareil : un preflight CORS ne peut pas porter
+        n'exige PAS la cle d'acces : un preflight CORS ne peut pas porter
         d'en-tete personnalise.
 
    200  { connected:false, activities:[] }
@@ -71,11 +71,12 @@
    Strava, aucun fuseau n'est recalcule ici).
 
    ERREURS -- table complete, aucune autre forme n'est emise
-     401 { error:'unauthorized' }           cle d'appareil absente ou fausse
+     401 { error:'unauthorized' }           cle d'acces absente, malformee,
+          inconnue, fausse, ou profil desactive. Ces cinq cas sont
+          VOLONTAIREMENT indiscernables : sur un site public, les separer
+          offrirait un oracle d'enumeration des profils.
      405 { error:'method_not_allowed' }     + en-tete Allow
      500 { error:'config', missing:[noms] } STRAVA_CLIENT_ID / _SECRET absents
-     503 { error:'unavailable' }            APP_ACCESS_KEY absente ou trop
-          courte cote serveur. ATTENTION : ce corps n'a PAS de champ reason.
      503 { error:'blobs', reason:'module'|'lambda'|'unconfigured'|'io' }
                                             panne de stockage serveur
      409 { error:'strava', reason:'reauth' }      reconnexion necessaire
@@ -92,7 +93,7 @@
           devient un 200 avec partial ou stop:'budget'.
      502 { error:'strava', reason:'network'|'upstream'|'bad_response' }
      500 { error:'server_error' }                 jamais d'exception nue
-   Le 409 est volontairement distinct du 401 : 401 = cle d'appareil refusee,
+   Le 409 est volontairement distinct du 401 : 401 = cle d'acces refusee,
    409 = Strava demande une reconnexion. Le client ne doit pas confondre.
 
    INTERDITS ABSOLUS dans la reponse : access_token, refresh_token, athlete /
@@ -227,10 +228,13 @@ exports.handler = async function (event) {
     // 1. Preflight AVANT la cle : un preflight CORS ne peut pas porter
     //    d'en-tete personnalise, il doit rester ouvert.
     if (method === 'OPTIONS') return C.preflight(ALLOWED);
-    // 2. Cle d'appareil : fail-closed, avant tout traitement et avant meme
+    // 2. Cle d'acces : fail-closed, avant tout traitement et avant meme
     //    de dire si la methode est bonne (aucun signal a un inconnu).
-    const denied = C.checkKey(event);
-    if (denied) return denied;
+    //    Le profil en RESULTE ; il n'est lu ni dans l'URL ni dans un
+    //    en-tete, et c'est le seul espace de donnees adressable ensuite.
+    const auth = await C.checkKey(event);
+    if (auth.denied) return auth.denied;
+    const profile = auth.profile;
     // 3. Methode, seulement une fois l'appelant authentifie.
     if (method !== 'GET') return C.methodNotAllowed(ALLOWED);
 
@@ -248,7 +252,7 @@ exports.handler = async function (event) {
 
     let token = null;
     try {
-      token = await C.readToken(event);           // event : invariant connectLambda
+      token = await C.readToken(event, profile.id);   // event : invariant connectLambda
     } catch (e) {
       return C.storeFailure(e);
     }
@@ -263,7 +267,7 @@ exports.handler = async function (event) {
     // chose -- voir ensureAccessToken.
     let access = '';
     try {
-      const ensured = await C.ensureAccessToken(event, token, deadline);
+      const ensured = await C.ensureAccessToken(event, profile.id, token, deadline);
       access = ensured.access_token;
     } catch (e) {
       if (C.isStoreError(e)) return C.storeFailure(e);
