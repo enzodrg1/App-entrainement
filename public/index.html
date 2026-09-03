@@ -216,22 +216,17 @@ input.io::placeholder{color:var(--dim)}
 .plan-msg{white-space:pre-wrap; word-break:break-word}
 .plan-msg.err{color:var(--amber)}
 .plan-msg.ok{color:var(--moss)}
-/* Migration de profil : ni alerte sante, ni felicitations. Ton neutre.
-   L'AMBRE EST RESERVE AUX ALERTES SANTE (sections Vigilance) : on ne
-   l'utilise pas ici, meme pour l'echec de migration. */
-/* #page-plan ne porte aucun padding horizontal (ce sont ses enfants qui
-   le portent) : la carte doit donc apporter sa propre marge laterale. */
-.card.mig{border-color:rgba(134,180,154,.35); margin:12px 14px 0}
-.card.mig h3{color:var(--moss)}
-.card.mig.failed{border-color:rgba(255,107,53,.45)}
-.card.mig.failed h3{color:var(--orange)}
-.miglist{margin:8px 0 0; padding:0; list-style:none}
-.miglist li{display:flex; justify-content:space-between; gap:12px; font-size:13px; line-height:1.5; margin-bottom:4px}
-.miglist li b{font-weight:600; color:var(--ink); min-width:0; overflow-wrap:break-word}
-.miglist li span{flex:1 1 auto; color:var(--muted); text-align:right; min-width:0; overflow-wrap:anywhere}
-#savealert-migtext{white-space:pre-line}
-.miglist li.same span{color:var(--moss)}
-.miglist li.diff span{color:var(--orange); font-weight:600}
+/* Panneau « Vérifier mes données » (onglet Zones). Ni alerte sante, ni
+   felicitations : ton neutre. L'AMBRE EST RESERVE AUX ALERTES SANTE
+   (sections Vigilance) : on ne l'utilise pas ici. L'orange ne signale que
+   ce qui n'a PAS pu etre lu ; une difference entre les deux copies est un
+   etat normal, elle reste en gris. */
+.vlist{margin:8px 0 0; padding:0; list-style:none}
+.vlist li{display:flex; justify-content:space-between; gap:12px; font-size:13px; line-height:1.5; margin-bottom:4px}
+.vlist li b{font-weight:600; color:var(--ink); min-width:0; overflow-wrap:break-word}
+.vlist li span{flex:1 1 auto; color:var(--muted); text-align:right; min-width:0; overflow-wrap:anywhere}
+.vlist li.same span{color:var(--moss)}
+.vlist li.diff span{color:var(--orange); font-weight:600}
 .note.okmsg{color:var(--moss)}
 .note.diffmsg{color:var(--orange)}
 </style>
@@ -249,10 +244,6 @@ input.io::placeholder{color:var(--dim)}
     <p>L'app n'a pas réussi à lire <b id="savealert-what">tes données</b> sur cet appareil. Pour ne rien écraser, <b>toute saisie concernée est refusée</b> — et <b>ne te fie pas à ce qui est affiché ici</b>, ce n'est pas ton historique réel.<br>
     Ferme complètement l'app et rouvre-la. Si ça persiste : vérifie que tu n'es pas en navigation privée, libère de l'espace, puis restaure ta dernière sauvegarde depuis l'onglet Journal. Le plan reste consultable.</p>
   </div>
-  <div id="savealert-mig" class="hidden">
-    <b id="savealert-migtitle"></b>
-    <p id="savealert-migtext"></p>
-  </div>
   <button type="button" id="savealert-export">Exporter mes données maintenant</button>
 </div>
 
@@ -266,16 +257,6 @@ input.io::placeholder{color:var(--dim)}
 </header>
 
 <section id="page-plan">
-  <!-- Resume de migration (chantier 3, etape 1). Masque par defaut : il
-       n'apparait qu'au lancement ou la migration a reellement copie
-       quelque chose, ou si elle a echoue. Non bloquant. -->
-  <div class="card mig hidden" id="migcard">
-    <h3 id="migtitle"></h3>
-    <p class="note" id="migtext" style="margin-top:0; white-space:pre-line"></p>
-    <ul class="miglist" id="miglist"></ul>
-    <p class="note hidden" id="migfoot"></p>
-    <button class="btn ghost hidden" id="migclose" type="button" style="margin-top:10px; width:100%">Fermer</button>
-  </div>
   <div class="todaywrap"><div class="lbl">Aujourd'hui</div><div id="todaycard"></div></div>
   <div class="profile" aria-label="Charge par semaine">
     <svg id="loadsvg" viewBox="0 0 360 86" preserveAspectRatio="none" role="img" aria-label="Profil de charge : montée jusqu'à la semaine 5 puis affûtage"></svg>
@@ -383,9 +364,9 @@ input.io::placeholder{color:var(--dim)}
   <div class="card">
     <h3>🗂 Vérifier mes données</h3>
     <p class="note" id="verifymode" style="margin-top:0"></p>
-    <p class="note">Compare <b>caractère par caractère</b> tes anciennes données et leur copie sous ton profil. Les anciennes sont conservées : cette vérification ne modifie ni ne supprime rien, tu peux la relancer autant de fois que tu veux.</p>
+    <p class="note">Pour chaque donnée : d'où vient ce que l'app affiche, combien elle en contient, et — quand les deux copies existent — leur comparaison <b>caractère par caractère</b>. Cette vérification ne modifie ni ne supprime rien, tu peux la relancer autant de fois que tu veux.</p>
     <div class="frow" style="margin-top:8px"><button class="btn ghost" id="verifydata" type="button">Vérifier mes données</button></div>
-    <ul class="miglist" id="verifylist"></ul>
+    <ul class="vlist" id="verifylist"></ul>
     <p class="note hidden" id="verifymsg"></p>
   </div>
 
@@ -500,6 +481,7 @@ let readFailed = {};
 
 /* ======================================================================
    PROFIL DE STOCKAGE (chantier 3, etape 1)
+
    Les cles localStorage sont prefixees par un identifiant de profil.
    LE PREFIXE EST APPLIQUE ICI ET NULLE PART AILLEURS : a la frontiere du
    stockage, dans sget / sset / sdel. Aucun site d'appel ne change,
@@ -508,70 +490,218 @@ let readFailed = {};
    `mem` et `readFailed` restent indexes par le NOM LOGIQUE (non prefixe),
    pour que saveUser(), noteReadFailures(), brokenKeysLabel() et le bandeau
    #savealert continuent de fonctionner sans modification.
+
+   IL N'Y A PAS DE MIGRATION. Une cle se deplace d'elle-meme A SA PREMIERE
+   ECRITURE. sget() lit la cle prefixee et, si elle est ABSENTE, se replie
+   sur l'ancienne cle non prefixee.
+
+   LA PROPRIETE QUI REND CE REPLI SUR, ET QU'IL FAUT PRESERVER : les
+   ecritures ne vont QUE sous le prefixe. La copie prefixee est donc
+   TOUJOURS plus recente ou egale a l'ancienne, PAR CONSTRUCTION. Il n'y a
+   jamais a arbitrer laquelle fait foi : si la prefixee existe, elle gagne.
+   Toujours. Aucune exception. (Les mecanismes qui arbitraient — marqueur,
+   mode ancien, discriminant de completude — ont produit quatre fois le meme
+   symptome et ont ete supprimes.)
+
+   LE PIEGE A NE PAS REOUVRIR : une LECTURE EN ECHEC n'est PAS une absence.
+   Si la cle PREFIXEE est illisible, on ne se replie SURTOUT PAS sur
+   l'ancienne : la copie prefixee existe, elle est seulement illisible, et
+   afficher l'ancienne reviendrait a presenter un instantane gele comme
+   l'historique reel. On marque readFailed[k], et la machinerie deja
+   eprouvee prend le relais : saisie refusee, export marque incomplet,
+   bandeau #savealert explicite.
+
+   LES ANCIENNES CLES NE SONT JAMAIS NI ECRITES NI SUPPRIMEES. Arbitrage
+   d'Enzo : elles restent gelees comme filet de securite jusqu'a la fin du
+   chantier 3. rawSet() et rawDel() refusent STRUCTURELLEMENT tout nom qui
+   ne porte pas le prefixe du profil — aucun chemin ne peut viser une
+   ancienne cle en ecriture ou en suppression.
    ====================================================================== */
 const PROFILE_ID  = "enzo";   // etape 1 : profil unique, code en dur
 const PROFILE_SEP = ":";
-/* false = MODE ANCIEN : la migration a echoue, on lit et on ecrit sur les
-   cles NON prefixees pour ne rien perdre ni bloquer. */
-let PROFILE_PREFIXED = true;
-/* Anomalie de migration a porter dans #savealert. Declare ICI, pas dans le
-   module de migration plus bas : renderSaveBanner() le lit, et un `let`
-   n'est pas hoiste — il resterait en zone morte temporelle. */
-let MIG_ALERT = null;
-/* Seule fonction qui calcule un nom de cle physique prefixe. Aucune
-   concatenation de prefixe ailleurs dans le fichier. */
+/* Seule fonction qui concatene le prefixe. Aucune autre dans le fichier. */
 function profileKey(k){ return PROFILE_ID + PROFILE_SEP + k; }
-/* Nom physique effectif d'une cle logique, selon le mode courant. */
-function pkey(k){ return PROFILE_PREFIXED ? profileKey(k) : k; }
+/* GARDE STRUCTURELLE : un nom physique n'est MODIFIABLE que s'il porte le
+   prefixe du profil. C'est ce qui rend impossible, par construction, qu'un
+   chemin quelconque ecrive ou supprime une ancienne cle. */
+function isProfileKey(phys){
+  return typeof phys === "string" && phys.indexOf(PROFILE_ID + PROFILE_SEP) === 0;
+}
+/* BACKEND UNIQUE, decide en UN SEUL endroit : window.storage n'est retenu
+   que s'il sait LIRE ET ECRIRE. Un window.storage partiel (get sans set)
+   faisait ecrire dans localStorage et relire dans window.storage : la
+   valeur ecrite n'etait jamais relue. Lire et ecrire au meme endroit est la
+   condition meme du repli. */
+function winStore(){
+  const s = window.storage;
+  return (s && typeof s.get === "function" && typeof s.set === "function") ? s : null;
+}
 
-async function sget(k, d){
-  const pk = pkey(k);
-  delete readFailed[k];
-  if(window.storage && window.storage.get){
+/* ---------- primitives BRUTES ------------------------------------------
+   Chaines exactes : pas de JSON.parse, pas de `mem`, pas de `readFailed`.
+   Le nom PHYSIQUE est fourni tel quel par l'appelant — le repli doit
+   pouvoir viser l'ancienne cle comme la nouvelle dans la meme execution.
+   ---------------------------------------------------------------------- */
+/* {state:"ok"|"absent"|"fail", value:string}. « fail » n'est JAMAIS
+   assimile a « absent » : c'est toute la difference entre « il n'y a rien a
+   lire » et « je n'ai pas su lire ». */
+async function rawGet(phys){
+  // winStore() DANS le try : un window.storage dont le simple acces aux
+  // proprietes leve doit produire un « fail » lisible par sget(), pas une
+  // exception qui remonte et fait diagnostiquer une panne reseau.
+  let st = null;
+  try{ st = winStore(); }catch(e){ return {state:"fail", value:""}; }
+  if(st){
     try{
-      const r = await window.storage.get(pk);
-      if(!r) return d;                 // cle absente : cas normal
-      return JSON.parse(r.value);
-    }catch(e){ readFailed[k] = true; return d; }
+      const r = await st.get(phys);
+      if(!r) return {state:"absent", value:""};
+      if(typeof r.value !== "string") return {state:"fail", value:""};
+      return {state:"ok", value:r.value};
+    }catch(e){ return {state:"fail", value:""}; }
   }
   try{
-    const v = localStorage.getItem(pk);
-    if(v === null) return d;           // cle absente : cas normal
-    return JSON.parse(v);
-  }catch(e){ readFailed[k] = true; }
-  if(k in mem){ delete readFailed[k]; return mem[k]; }
+    const v = localStorage.getItem(phys);
+    if(v === null) return {state:"absent", value:""};
+    return {state:"ok", value:String(v)};
+  }catch(e){ return {state:"fail", value:""}; }
+}
+async function rawSet(phys, str){
+  if(!isProfileKey(phys)) return false;          // garde structurelle
+  let st = null;
+  try{ st = winStore(); }catch(e){ return false; }
+  if(st){
+    try{ await st.set(phys, str); return true; }catch(e){ return false; }
+  }
+  try{ localStorage.setItem(phys, str); return true; }catch(e){}
+  return false;
+}
+async function rawDel(phys){
+  if(!isProfileKey(phys)) return false;          // garde structurelle
+  let st = null;
+  try{ st = winStore(); }catch(e){ return false; }
+  if(st){
+    try{
+      if(st.delete) await st.delete(phys);
+      else if(st.remove) await st.remove(phys);
+      else await st.set(phys, "null");
+    }catch(e){ return false; }
+    return true;
+  }
+  try{ localStorage.removeItem(phys); return true; }catch(e){}
+  return false;
+}
+
+/* ---------- pierres tombales -------------------------------------------
+   sdel() ne supprime que la copie PREFIXEE. Sans precaution, le repli
+   RESSUSCITERAIT l'ancienne valeur au sget suivant : « Plan par défaut »
+   ne retirerait pas le plan importe, et une deconnexion Strava reviendrait
+   avec son cache. On enregistre donc les NOMS LOGIQUES explicitement
+   abandonnes, dans une unique cle prefixee.
+
+   LISTE BLANCHE. Une pierre tombale EMPECHE le repli : une entree parasite
+   sur une cle utilisateur masquerait un historique intact sans poser le
+   moindre readFailed — exactement la classe de bug qui a tue l'approche A.
+   Aucun code de l'app ne peut produire cet etat, mais on ne s'appuie pas
+   sur l'usage : seules les cles REELLEMENT supprimables sont acceptees, en
+   lecture comme en ecriture. Tout autre nom, y compris tgcm-done /
+   tgcm-log / tgcm-races, est ignore.
+   DEGRADATION VOULUE : si la liste est ILLISIBLE, tombHas() renvoie false
+   et le repli reste actif. Mieux vaut ressusciter un plan importe — visible
+   immediatement, et retirable d'un bouton — que masquer une donnee. */
+const TOMB_KEY = "storage-removed";
+/* Les SEULES cles qu'un sdel() vise reellement. Toute autre valeur trouvee
+   dans la liste est du bruit et ne doit jamais bloquer un repli. */
+const TOMB_ALLOWED = ["plan-override", "tgcm-strava-cache", "tgcm-probe"];
+function tombAllowed(k){
+  // Double garde : appartenance a la liste blanche ET exclusion explicite des
+  // cles utilisateur, pour qu'un futur ajout distrait a TOMB_ALLOWED ne
+  // puisse pas rouvrir la breche.
+  return TOMB_ALLOWED.indexOf(k) >= 0 && USER_KEYS.indexOf(k) < 0;
+}
+let TOMBS = null;      // Set des noms logiques abandonnes ; null = pas encore lue
+async function tombRead(){
+  if(TOMBS) return TOMBS;
+  const r = await rawGet(profileKey(TOMB_KEY));
+  if(r.state === "fail") return null;            // illisible : rien en cache, on reessaiera
+  let arr = [];
+  if(r.state === "ok"){
+    try{
+      const v = JSON.parse(r.value);
+      if(Array.isArray(v)) arr = v.filter(function(x){ return typeof x === "string" && tombAllowed(x); });
+    }catch(e){}
+  }
+  TOMBS = new Set(arr);
+  return TOMBS;
+}
+async function tombHas(k){
+  let s = null;
+  try{ s = await tombRead(); }catch(e){ s = null; }
+  return !!s && s.has(k);
+}
+async function tombAdd(k){
+  if(!tombAllowed(k)) return true;               // rien a enregistrer, rien a signaler
+  let s = null;
+  try{ s = await tombRead(); }catch(e){ s = null; }
+  if(s && s.has(k)) return true;
+  const next = new Set(s || []);
+  next.add(k);
+  const ok = await rawSet(profileKey(TOMB_KEY), JSON.stringify(Array.from(next)));
+  if(ok) TOMBS = next;
+  return ok;
+}
+
+/* Lecture en echec. `mem` fait foi si CETTE session a deja ecrit la cle :
+   la valeur en memoire est alors la plus recente, et c'est bien celle
+   d'Enzo. Sinon readFailed + valeur par defaut, et AUCUN repli. */
+function sgetFail(k, d){
+  if(k in mem) return mem[k];
+  readFailed[k] = true;
   return d;
+}
+async function sget(k, d){
+  delete readFailed[k];
+  const cur = await rawGet(profileKey(k));
+  if(cur.state === "ok"){
+    try{ return JSON.parse(cur.value); }catch(e){ return sgetFail(k, d); }
+  }
+  // ILLISIBLE sous le profil : aucun repli (cf. l'en-tete de bloc).
+  if(cur.state === "fail") return sgetFail(k, d);
+  // ABSENTE sous le profil : repli sur l'ancienne cle, sauf si elle a ete
+  // explicitement supprimee pour ce profil.
+  if(await tombHas(k)) return d;
+  const old = await rawGet(k);
+  if(old.state === "ok"){
+    try{ return JSON.parse(old.value); }catch(e){ return sgetFail(k, d); }
+  }
+  if(old.state === "fail") return sgetFail(k, d);
+  return d;                                      // absente des deux cotes : appareil neuf
 }
 /* Renvoie true si la valeur a bien ete PERSISTEE, false sinon (quota depasse,
    mode prive, serialisation impossible). La valeur reste toujours en memoire.
-   Les appels existants ignorent la valeur de retour : signature compatible. */
+   Les appels existants ignorent la valeur de retour : signature compatible.
+   N'ECRIT QUE SOUS LE PREFIXE, jamais sur une ancienne cle. */
 async function sset(k, v){
   mem[k] = v;
-  const pk = pkey(k);
   let str;
   try{ str = JSON.stringify(v); }catch(e){ return false; }
-  if(window.storage && window.storage.set){
-    try{ await window.storage.set(pk, str); return true; }catch(e){}
-  }
-  try{ localStorage.setItem(pk, str); return true; }catch(e){}
-  return false;
+  return await rawSet(profileKey(k), str);
 }
+/* NE SUPPRIME QUE LA COPIE PREFIXEE, et pose la pierre tombale sans
+   laquelle le repli ferait revenir l'ancienne valeur au sget suivant.
+   Une reecriture ulterieure (reimport d'un plan) n'est pas bloquee : la
+   pierre tombale n'est consultee que si la cle prefixee est ABSENTE.
+
+   RENVOIE true SEULEMENT SI LE RETRAIT TIENDRA. Sans la pierre tombale, la
+   suppression ne survit pas au rechargement : le repli rendrait l'ancienne
+   valeur. Avaler cet echec faisait annoncer « Plan par défaut rétabli ✓ »
+   pour un plan qui revenait au lancement suivant. Les appelants doivent
+   tester le retour et dire la verite. */
 async function sdel(k){
   delete mem[k];
-  const pk = pkey(k);
-  if(window.storage){
-    try{
-      if(window.storage.delete) await window.storage.delete(pk);
-      else if(window.storage.remove) await window.storage.remove(pk);
-      else if(window.storage.set) await window.storage.set(pk, "null");
-    }catch(e){}
-  }
-  try{ localStorage.removeItem(pk); }catch(e){}
-  // Une suppression legitime (« Plan par défaut », deconnexion Strava) ne
-  // passe pas par saveUser() : sans ce rattrapage, un marqueur reste en
-  // attente et le lancement suivant recopierait la cle qu'Enzo vient de
-  // retirer. Sans effet si aucun marqueur n'est en attente.
-  try{ await migFlagRetry(); }catch(e){}
+  const efface = await rawDel(profileKey(k));
+  let marque = false;
+  try{ marque = await tombAdd(k); }catch(e){ marque = false; }
+  return efface && marque;
 }
 
 /* ======================================================================
@@ -608,31 +738,13 @@ function saveFailMsg(prefix, key){
 
 function renderSaveBanner(){
   const el = $("savealert"); if(!el) return;
-  const migOn = !!MIG_ALERT;
-  const show = SAVE_FAILED || READ_BROKEN || migOn;
+  const show = SAVE_FAILED || READ_BROKEN;
   el.classList.toggle("hidden", !show);
   // Evite la double marge d'encoche : header et bandeau ajoutent tous deux
   // env(safe-area-inset-top). Quand le bandeau est la, c'est lui qui la porte.
   document.body.classList.toggle("hasalert", show);
-  // Une anomalie de migration REMPLACE les deux autres blocs : son texte dit
-  // deja ce qui est refuse et ce qu'il faut faire. La consequence d'un echec
-  // d'ecriture ne doit pas se perdre pour autant : on l'ajoute a la fin.
-  const migEl = $("savealert-mig");
-  if(migEl){
-    migEl.classList.toggle("hidden", !migOn);
-    if(migOn){
-      $("savealert-migtitle").textContent = MIG_ALERT.title;
-      // Le bloc migration remplace les deux autres : leurs consequences
-      // concretes (saisie refusee, ecriture perdue) sont reprises ici pour
-      // qu'aucune information ne disparaisse.
-      $("savealert-migtext").textContent = MIG_ALERT.head
-        + (MIG_ALERT.noScope ? "" : migScope())
-        + (SAVE_FAILED && READ_BROKEN ? "\nEt ta dernière modification n'a pas pu être enregistrée : le stockage est plein." : "")
-        + "\n" + MIG_ALERT.todo;
-    }
-  }
-  $("savealert-read").classList.toggle("hidden", migOn || !READ_BROKEN);
-  $("savealert-write").classList.toggle("hidden", migOn || READ_BROKEN);
+  $("savealert-read").classList.toggle("hidden", !READ_BROKEN);
+  $("savealert-write").classList.toggle("hidden", READ_BROKEN);
   if(READ_BROKEN) $("savealert-what").textContent = brokenKeysLabel();
   // L'export reste accessible dans les DEUX modes : le masquer ne protegeait de
   // rien (#btnexport de l'onglet Journal restait actif) et privait Enzo du
@@ -666,9 +778,6 @@ async function saveUser(k, v, iso, force){
       delete readFailed[k];
       READ_BROKEN = USER_KEYS.some(function(x){ return !!readFailed[x]; });
     }
-    // Le stockage repond : c'est le moment de reposer un marqueur de
-    // migration qui n'avait pas pu l'etre (cf. migFlagRetry).
-    try{ await migFlagRetry(); }catch(e){}
     // sset ecrit l'objet ENTIER : un succes rattrape tout ce qui etait en attente.
     unsavedDays = {};
     SAVE_FAILED = false;
@@ -695,50 +804,24 @@ async function storageProbe(){
 }
 
 /* ======================================================================
-   MIGRATION VERS LES CLES PREFIXEES PAR PROFIL (chantier 3, etape 1)
+   « VERIFIER MES DONNEES » — support (chantier 3, etape 1)
 
-   QUI FAIT FOI ? C'est LA question, et le marqueur y repond :
-   - MARQUEUR ABSENT  -> les ANCIENNES cles font foi. Une cle prefixee n'est
-     alors qu'un BROUILLON laisse par une execution avortee : elle ne peut
-     jamais etre promue en source de verite. SEULE EXCEPTION, tranchee par la
-     COMPLETUDE des copies : si les 7 copies sont la, la phase de copie etait
-     terminee et seule une session en mode profil a pu ecrire depuis — ce
-     n'est pas un brouillon, c'est le marqueur qui s'est perdu.
-   - MARQUEUR POSE    -> les cles PREFIXEES font foi, on n'y touche plus et
-     on ne recopie plus rien.
-   Sans cette regle, un brouillon perime ecrasait ce qu'Enzo avait ecrit
-   entre-temps dans les anciennes cles, et l'app affichait un vert rassurant.
+   Il n'y a plus d'evenement de migration, donc plus de resume au premier
+   lancement. A la place, un panneau PERMANENT dans l'onglet Zones,
+   rejouable a volonte, qui dit pour chaque cle :
+     - D'OU VIENT ce que l'app affiche : « ton profil » ou « ton ancienne
+       copie » ;
+     - le decompte reconnaissable (seances cochees, entrees de journal,
+       courses, version du plan) ;
+     - quand les DEUX copies existent, la comparaison CARACTERE POUR
+       CARACTERE et son verdict.
 
-   Le marqueur est ecrit SOUS DEUX NOMS (prefixe ET non prefixe) : perdre
-   les deux tout en conservant les donnees est tres improbable, et l'un des
-   deux suffit a conclure « deja migre ». Sans cette redondance, un marqueur
-   perdu ferait recopier des donnees anciennes par-dessus des recentes —
-   l'erreur inverse, tout aussi grave.
-
-   Ordre d'execution — L'ORDRE EST LA SECURITE :
-   1. lire en CHAINE BRUTE (aucun JSON.parse : on copie des octets) ;
-   2. distinguer ABSENTE / PRESENTE / ILLISIBLE. Une lecture en echec n'est
-      JAMAIS traitee comme une absence ;
-   3. PASSE 1, lecture seule : inventaire complet des 7 cles. Aucune ecriture
-      tant qu'on ne sait pas si l'etat est coherent ;
-   4. PASSE 2 : ecrire les copies manquantes, puis RELIRE et comparer la
-      chaine exacte, caractere pour caractere ;
-   5. marqueur seulement apres, sous ses deux noms, puis relu.
-
-   EN MODE PROFIL, LES ANCIENNES CLES NE SONT NI ECRITES NI SUPPRIMEES.
-   Arbitrage explicite d'Enzo : elles sont gardees comme filet de securite
-   jusqu'a la fin du chantier 3, et aucun code de la migration ne les supprime,
-   meme desactive. EN MODE ANCIEN, ce sont elles qui vivent : `sdel` y agit
-   donc sur les noms non prefixes (« Plan par défaut », deconnexion Strava) et
-   `plan-cache` y est reconstruite — c'est la semantique normale de ce mode.
-   Les trois cles utilisateur (tgcm-done / tgcm-log / tgcm-races) ne sont
-   visees par aucun `sdel`, dans aucun des deux modes.
+   Ce module ne fait que des LECTURES. Il n'ecrit rien, ne supprime rien,
+   n'appelle pas le reseau, et ne rend jamais la valeur d'une cle :
+   `strava-key` est un secret d'appareil, il ne s'affiche pas.
    ====================================================================== */
-
-/* Les 7 cles migrees. `tgcm-probe` est prefixee comme les autres (via
-   sset/sdel) mais n'a rien a migrer : la sonde la cree et l'efface. */
-const MIGRATE_KEYS = ["tgcm-done", "tgcm-log", "tgcm-races", "plan-override", "strava-key", "plan-cache", "tgcm-strava-cache"];
-const MIGRATE_LABEL = {
+const STORED_KEYS = ["tgcm-done", "tgcm-log", "tgcm-races", "plan-override", "strava-key", "plan-cache", "tgcm-strava-cache"];
+const STORED_LABEL = {
   "tgcm-done": "Séances",
   "tgcm-log": "Journal (ressentis et gênes)",
   "tgcm-races": "Courses",
@@ -747,77 +830,16 @@ const MIGRATE_LABEL = {
   "plan-cache": "Cache du plan",
   "tgcm-strava-cache": "Cache Strava"
 };
-/* Le marqueur est ecrit en DEUX exemplaires INDEPENDANTS, tous deux
-   PREFIXES : le principe « toute cle de ce profil porte son prefixe » reste
-   entier (aucune collision possible quand d'autres profils existeront), et
-   « absent » veut toujours dire « migration jamais terminee », puisqu'il
-   faudrait perdre les deux. */
-const MIGRATE_FLAG   = "profile-migrated";
-const MIGRATE_FLAG_2 = "profile-migrated-2";
-function migFlagNames(){ return [profileKey(MIGRATE_FLAG), profileKey(MIGRATE_FLAG_2)]; }
-const MIGRATE_FLAG_V = 1;
-let MIGRATE_REPORT = null;   // compte rendu de la derniere execution (MIG_ALERT est declare plus haut)
-
-/* ----------------------------------------------------------------------
-   Primitives BRUTES. Elles ne passent PAS par sget/sset : pas de
-   JSON.parse, pas de `mem`, pas de `readFailed`, et le nom physique est
-   fourni tel quel par l'appelant (on doit pouvoir viser l'ancienne cle
-   comme la nouvelle dans la meme execution).
-   ---------------------------------------------------------------------- */
-/* {state:"ok"|"absent"|"fail", value:string}. Meme ordre de preference que
-   sget() : window.storage s'il existe, sinon localStorage. */
-async function rawGet(phys){
-  if(window.storage && window.storage.get){
-    try{
-      const r = await window.storage.get(phys);
-      if(!r) return {state:"absent", value:""};
-      if(typeof r.value !== "string") return {state:"fail", value:""};
-      return {state:"ok", value:r.value};
-    }catch(e){ return {state:"fail", value:""}; }
-  }
-  try{
-    const v = localStorage.getItem(phys);
-    if(v === null) return {state:"absent", value:""};
-    return {state:"ok", value:String(v)};
-  }catch(e){ return {state:"fail", value:""}; }
-}
-/* Meme ordre de preference que sset() : ce que la migration ecrit doit
-   atterrir exactement la ou sset() ecrira ensuite. */
-async function rawSet(phys, str){
-  if(window.storage && window.storage.set){
-    try{ await window.storage.set(phys, str); return true; }catch(e){}
-  }
-  try{ localStorage.setItem(phys, str); return true; }catch(e){}
-  return false;
-}
-/* Supprime un BROUILLON PREFIXE dont on vient de prouver qu'il est faux.
-   GARDE-FOU : refuse tout nom qui ne commence pas par le prefixe du profil.
-   Les anciennes cles non prefixees ne sont JAMAIS supprimees, ni ici ni
-   ailleurs — c'est le filet de securite d'Enzo. */
-async function rawDelDraft(phys){
-  if(typeof phys !== "string" || phys.indexOf(PROFILE_ID + PROFILE_SEP) !== 0) return false;
-  if(window.storage){
-    try{
-      if(window.storage.delete) await window.storage.delete(phys);
-      else if(window.storage.remove) await window.storage.remove(phys);
-      else if(window.storage.set) await window.storage.set(phys, "null");
-    }catch(e){}
-  }
-  try{ localStorage.removeItem(phys); }catch(e){}
-  const chk = await rawGet(phys);
-  return chk.state === "absent";
-}
 
 /* Decompte AFFICHABLE uniquement. La comparaison, elle, reste toujours
-   faite sur la chaine brute. Ne rend jamais la valeur d'une cle :
-   `strava-key` est un secret d'appareil, il ne s'affiche pas. */
-function migCount(k, str){
+   faite sur la chaine brute. Ne rend jamais la valeur d'une cle. */
+function storedCount(k, str){
   if(typeof str !== "string") return "";
   if(k === "strava-key") return "enregistrée";
   let v;
-  try{ v = JSON.parse(str); }catch(e){ return "recopiée telle quelle (contenu non lisible en JSON)"; }
+  try{ v = JSON.parse(str); }catch(e){ return "contenu non lisible en JSON"; }
   if(k === "tgcm-done"){
-    if(!isPlainObject(v)) return "forme inattendue, recopiée telle quelle";
+    if(!isPlainObject(v)) return "forme inattendue";
     const ks = Object.keys(v);
     // `false` = seance explicitement PAS faite. Ce n'est pas une absence :
     // on la compte a part plutot que de la passer sous silence.
@@ -826,408 +848,63 @@ function migCount(k, str){
     return t + " cochée" + (t>1?"s":"") + (f>0 ? " · " + f + " décochée" + (f>1?"s":"") : "");
   }
   if(k === "tgcm-log"){
-    if(!isPlainObject(v)) return "forme inattendue, recopiée telle quelle";
+    if(!isPlainObject(v)) return "forme inattendue";
     const n = Object.keys(v).length;
     return n + " entrée" + (n>1?"s":"");
   }
   if(k === "tgcm-races"){
-    if(!Array.isArray(v)) return "forme inattendue, recopiée telle quelle";
+    if(!Array.isArray(v)) return "forme inattendue";
     // Un tableau VIDE n'est pas une absence : il s'affiche comme 0 course.
     return v.length + " course" + (v.length>1?"s":"");
   }
-  if(k === "plan-override"){
+  if(k === "plan-override" || k === "plan-cache"){
     return (isPlainObject(v) && v.version !== undefined) ? ("version " + v.version) : "présent";
   }
   return "présent";
 }
 
-/* Un marqueur n'est valable que s'il porte la BONNE version ET le BON
-   profil : `{"v":1,"ok":true,"profile":"autre"}` ne doit pas laisser croire
-   que les donnees de ce profil-ci ont ete migrees. */
-function migFlagValid(r){
-  if(!r || r.state !== "ok") return false;
-  let f = null;
-  try{ f = JSON.parse(r.value); }catch(e){ return false; }
-  return !!f && f.ok === true && f.v === MIGRATE_FLAG_V && f.profile === PROFILE_ID;
-}
-/* Ecrit le marqueur sous ses DEUX noms, puis relit chacun pour confirmer.
-   Un seul des deux suffit a considerer la migration terminee. */
-async function migWriteFlags(){
-  const payload = JSON.stringify({v:MIGRATE_FLAG_V, ok:true, profile:PROFILE_ID, at:new Date().toISOString()});
-  const noms = migFlagNames();
-  let poses = 0;
-  for(let i = 0; i < noms.length; i++){
-    if(!(await rawSet(noms[i], payload))) continue;
-    const chk = await rawGet(noms[i]);
-    if(chk.state === "ok" && chk.value === payload && migFlagValid(chk)) poses++;
-  }
-  return poses > 0;
-}
-
-/* Toutes les cles ne pesent PAS pareil dans la decision de migration. Les
-   confondre, c'est raisonner a chaque lancement sur un instantane gele :
-
-   - DECISIVES : jamais supprimees par l'app, jamais reconstructibles. Elles
-     seules disent si la migration a eu lieu (COMPLETUDE) et si l'etat est
-     incoherent (DIVERGENCE).
-   - SUPPRIMABLES : `sdel` legitime (bouton « Plan par défaut », deconnexion
-     Strava). Leur copie prefixee peut manquer TOUT EN etant migree : les
-     compter dans la completude ferait conclure « la copie n'a jamais fini »,
-     et les recopier depuis l'ancienne cle gelee RESSUSCITERAIT ce qu'Enzo
-     vient de retirer. Elles ne sont donc copiees qu'a la PREMIERE migration.
-   - DERIVEES : reconstructibles et sans valeur. Illisibles, absentes ou
-     corrompues, elles ne disent RIEN sur les donnees d'Enzo : jamais de
-     `failed`, jamais de changement de mode. Migrees au mieux. */
-const MIGRATE_DECISIVE  = ["tgcm-done", "tgcm-log", "tgcm-races", "strava-key"];
-const MIGRATE_DELETABLE = ["plan-override", "tgcm-strava-cache"];
-const MIGRATE_DERIVED   = ["plan-cache", "tgcm-strava-cache"];
-function migIsDecisive(k){ return MIGRATE_DECISIVE.indexOf(k) >= 0; }
-function migIsDerived(k){ return MIGRATE_DERIVED.indexOf(k) >= 0; }
-
-/* Copies DECISIVES annoncees mais introuvables ou illisibles. C'est
-   l'EVIDENCE de base : elle est consultee par TOUTES les branches qui
-   concluent, pour qu'un meme etat physique donne toujours la meme
-   conclusion, marqueur present ou non. */
-async function migCheckGaps(){
-  const out = [];
-  for(let i = 0; i < MIGRATE_DECISIVE.length; i++){
-    const k = MIGRATE_DECISIVE[i];
-    const anc = await rawGet(k);
-    if(anc.state !== "ok") continue;              // pas d'ancienne copie : rien a comparer
-    const cur = await rawGet(profileKey(k));
-    if(cur.state === "ok") continue;
-    out.push({key:k, missing:(cur.state === "absent"),
-              oldCount:migCount(k, anc.value), oldLen:anc.value.length});
-  }
-  return out;
-}
-
-/* La boucle de copie suit l'ordre de MIGRATE_KEYS et s'arrete a la premiere
-   erreur : apres une premiere migration INTERROMPUE, les copies presentes
-   forment donc un PREFIXE de cet ordre. Une copie situee APRES un trou prouve
-   au contraire que la copie etait allee plus loin, et donc qu'une copie a ete
-   PERDUE depuis. C'est ce qui distingue « jamais fini » de « fini puis purge »
-   quand aucun marqueur ne peut le dire.
-   Les deux cles derivees sont les DERNIERES de l'ordre : une derivee sautee ne
-   peut donc jamais creer un faux trou au milieu. */
-function migPrefixeCoherent(etats){
-  let trou = -1;
-  for(let i = 0; i < MIGRATE_KEYS.length; i++){
-    const e = etats[MIGRATE_KEYS[i]];
-    if(e.from.state === "absent") continue;       // rien a copier pour cette cle
-    if(e.to.state !== "ok"){ trou = i; break; }
-  }
-  if(trou < 0) return true;
-  for(let i = trou + 1; i < MIGRATE_KEYS.length; i++){
-    if(etats[MIGRATE_KEYS[i]].to.state === "ok") return false;
-  }
-  return true;
-}
-
-/* Idempotente : relancable a chaque lancement, y compris apres une execution
-   interrompue a n'importe quelle etape. N'ecrit jamais sur une ancienne cle,
-   et n'en supprime aucune en MODE PROFIL (en mode ancien, `sdel` agit sur les
-   cles non prefixees : c'est la semantique normale de ce mode, et il ne vise
-   jamais tgcm-done / tgcm-log / tgcm-races).
-
-   REGLE GENERALE : aucune branche ne conclut — et surtout ne bascule en mode
-   ancien — sans avoir d'abord consulte l'EVIDENCE. Si les copies decisives
-   sont la et lisibles, la migration a manifestement eu lieu : on reste en mode
-   profil, quoi qu'il arrive par ailleurs sur une ancienne cle gelee.
-
-   Statuts rendus :
-     already      : marqueur pose, copies presentes -> mode profil
-     gap          : une copie DECISIVE manque alors que la migration a eu lieu
-                    -> alerte, aucune recopie, mode profil
-     undetermined : marqueur ILLISIBLE (pas absent) -> on ne conclut rien
-     done         : copies faites et verifiees -> mode profil
-     fresh        : rien a migrer (appareil neuf) -> mode profil
-     resume       : marqueur perdu, copies decisives completes -> marqueur
-                    repose, mode profil, RIEN n'est recopie
-     ambiguous    : divergence decisive ET copies incompletes -> MODE ANCIEN
-     failed       : AUCUNE evidence de migration, et copie/lecture impossible
-                    -> MODE ANCIEN */
-async function migrateProfileStorage(){
-  const rep = {status:"", reason:"", key:"", keys:[], copied:0, oldSeen:0,
-               gaps:[], diverged:[], flagPending:false, manifest:false};
-
-  /* --- Le marqueur, en deux exemplaires prefixes --------------------- */
-  const noms = migFlagNames();
-  const f1 = await rawGet(noms[0]);
-  const f2 = await rawGet(noms[1]);
-  const v1 = migFlagValid(f1), v2 = migFlagValid(f2);
-
-  if(v1 || v2){
-    rep.status = "already";
-    rep.manifest = true;
-    // Redondance entamee : on repose l'exemplaire manquant. Sans effet si
-    // l'ecriture echoue — un seul exemplaire suffit deja.
-    if(!v1 || !v2){ try{ await migWriteFlags(); }catch(e){} }
-    // Le marqueur AFFIRME que les copies existent : on le verifie, sinon un
-    // journal vide s'afficherait en silence.
-    rep.gaps = await migCheckGaps();
-    if(rep.gaps.length) rep.status = "gap";
-    return rep;
-  }
-
-  /* --- Marqueur ILLISIBLE : ce n'est PAS un marqueur absent ----------- */
-  // Repartir sur l'inventaire des anciennes cles reviendrait a renvoyer Enzo
-  // sur l'instantane gele pendant une panne de lecture passagere — et a le
-  // laisser saisir dessus. On s'appuie sur l'evidence disponible.
-  if(f1.state === "fail" || f2.state === "fail"){
-    rep.status = "undetermined";
-    rep.gaps = await migCheckGaps();   // vide = tout est la -> mode profil, en silence
-    return rep;                        // aucune ecriture, aucun marqueur, aucun changement de mode
-  }
-
-  /* --- PASSE 1 : LECTURE SEULE, ET AUCUNE CONCLUSION ------------------ */
-  // Aucune sortie dans cette boucle. Conclure au fil de la lecture, c'etait
-  // conclure avant d'avoir regarde les preuves : une seule ancienne cle
-  // illisible faisait basculer en mode ancien un appareil pourtant migre.
-  const etats = {};
-  for(let i = 0; i < MIGRATE_KEYS.length; i++){
-    const k = MIGRATE_KEYS[i];
-    etats[k] = { from: await rawGet(k), to: await rawGet(profileKey(k)) };
-  }
-
-  /* --- L'EVIDENCE ---------------------------------------------------- */
-  const copiesDecisives = MIGRATE_DECISIVE.filter(function(k){ return etats[k].to.state === "ok"; });
-  // Cle decisive dont la copie manque ALORS qu'il y a (ou peut y avoir)
-  // quelque chose a copier : `absent` cote ancien = rien a migrer.
-  const manqueDecisive = MIGRATE_DECISIVE.filter(function(k){
-    return etats[k].to.state !== "ok" && etats[k].from.state !== "absent";
-  });
-  // Au moins une copie decisive lisible = la migration a manifestement tourne.
-  rep.manifest = copiesDecisives.length > 0;
-
-  /* --- Inventaire d'affichage + divergences -------------------------- */
-  const aFaire = [];
-  for(let i = 0; i < MIGRATE_KEYS.length; i++){
-    const k = MIGRATE_KEYS[i], e = etats[k];
-    if(e.from.state === "fail" || e.to.state === "fail"){
-      rep.keys.push({key:k, action:"unreadable", count:"", len:0});
-      continue;
-    }
-    if(e.from.state === "absent"){
-      rep.keys.push({key:k, action:(e.to.state === "ok" ? "new-only" : "absent"),
-                     count:(e.to.state === "ok" ? migCount(k, e.to.value) : ""), len:(e.to.state === "ok" ? e.to.value.length : 0)});
-      continue;
-    }
-    rep.oldSeen++;
-    if(e.to.state === "ok"){
-      if(e.to.value === e.from.value){
-        rep.keys.push({key:k, action:"identical", count:migCount(k, e.to.value), len:e.to.value.length});
-      } else if(migIsDecisive(k)){
-        rep.diverged.push({key:k, oldCount:migCount(k, e.from.value), newCount:migCount(k, e.to.value),
-                           oldLen:e.from.value.length, newLen:e.to.value.length});
-        rep.keys.push({key:k, action:"diverged", count:migCount(k, e.from.value), len:e.from.value.length});
-      } else {
-        // Cle supprimable ou derivee : diverger de l'ancienne cle gelee est le
-        // comportement NORMAL apres migration. Ce n'est pas une incoherence.
-        rep.keys.push({key:k, action:"distinct", count:migCount(k, e.to.value), len:e.to.value.length});
-      }
-      continue;
-    }
-    aFaire.push({key:k, value:e.from.value});
-    rep.keys.push({key:k, action:"pending", count:migCount(k, e.from.value), len:e.from.value.length});
-  }
-
-  /* --- LA DECISION, evidence d'abord --------------------------------- */
-  if(rep.manifest){
-    // La migration a manifestement eu lieu : on reste en mode profil quoi
-    // qu'il arrive a une ancienne cle gelee, et on ne recopie JAMAIS
-    // par-dessus ce qui est deja la.
-    if(!manqueDecisive.length){
-      rep.status = "resume";
-      if(!(await migWriteFlags())) rep.flagPending = true;
-      return rep;
-    }
-    // Une copie APRES un trou : la boucle de copie etait forcement allee plus
-    // loin, donc une copie a ete PERDUE depuis. Meme etat physique que le
-    // chemin `gap` (marqueur present), donc MEME conclusion : on alerte, on ne
-    // recopie rien, et on ne repart surtout pas sur l'instantane gele.
-    if(!migPrefixeCoherent(etats)){
-      rep.status = "gap";
-      rep.gaps = await migCheckGaps();
-      return rep;
-    }
-    // Copies en prefixe ET divergence : elles peuvent etre des BROUILLONS
-    // perimes, ecrases depuis par des saisies faites en mode ancien. On ne
-    // tranche pas (cf. `ambiguous`).
-    if(rep.diverged.length){ rep.status = "ambiguous"; return rep; }
-    const reprisePossible = manqueDecisive.every(function(k){
-      // On ne recopie que par-dessus une copie VRAIMENT absente, depuis une
-      // ancienne cle VRAIMENT lisible.
-      return etats[k].from.state === "ok" && etats[k].to.state === "absent";
-    });
-    if(!reprisePossible){
-      rep.status = "gap";
-      rep.gaps = await migCheckGaps();
-      return rep;
-    }
-    // Sinon : premiere migration INTERROMPUE, on reprend la copie.
-  } else {
-    // AUCUNE evidence de migration. C'est ici, et seulement ici, que les
-    // anciennes cles font foi et qu'une lecture en echec est bloquante.
-    for(let i = 0; i < MIGRATE_KEYS.length; i++){
-      const k = MIGRATE_KEYS[i];
-      if(migIsDerived(k)) continue;              // une derivee ne pese jamais
-      if(etats[k].from.state === "fail"){ rep.status = "failed"; rep.reason = "read-old"; rep.key = k; return rep; }
-      if(etats[k].to.state === "fail"){ rep.status = "failed"; rep.reason = "read-new"; rep.key = k; return rep; }
-    }
-  }
-
-  /* --- PASSE 2 : ecriture puis relecture comparee --------------------- */
-  for(let i = 0; i < aFaire.length; i++){
-    const t = aFaire[i], phys = profileKey(t.key);
-    const derivee = migIsDerived(t.key);
-    if(!(await rawSet(phys, t.value))){
-      if(derivee){ continue; }
-      rep.status = "failed"; rep.reason = "write"; rep.key = t.key; return rep;
-    }
-    // Comparaison CARACTERE POUR CARACTERE de la chaine exacte : ni une
-    // longueur, ni un JSON.parse suivi d'une egalite floue.
-    const back = await rawGet(phys);
-    if(back.state !== "ok" || back.value !== t.value){
-      // Copie acceptee a l'ecriture mais qui ne se relit pas a l'identique :
-      // elle est CONNUE-FAUSSE. On la retire, sinon elle compterait comme une
-      // copie presente et le lancement suivant conclurait sur une donnee
-      // corrompue. C'est un brouillon prefixe qu'on vient d'ecrire soi-meme,
-      // jamais une ancienne cle.
-      try{ await rawDelDraft(phys); }catch(e){}
-      if(derivee){ continue; }
-      rep.status = "failed"; rep.reason = "verify"; rep.key = t.key; return rep;
-    }
-    rep.copied++;
-    for(let n = 0; n < rep.keys.length; n++){ if(rep.keys[n].key === t.key) rep.keys[n].action = "copied"; }
-  }
-
-  /* --- Marqueur ------------------------------------------------------ */
-  if(!(await migWriteFlags())){
-    // Toutes les copies sont ECRITES et VERIFIEES : elles sont bonnes. Un
-    // marqueur qu'on n'arrive pas a poser ne justifie PAS de repartir sur les
-    // anciennes cles. On reste en mode profil et on retentera : au prochain
-    // lancement, et des la prochaine ecriture ou suppression reussie.
-    rep.flagPending = true;
-  }
-  rep.status = rep.oldSeen ? "done" : "fresh";
-  return rep;
-}
-
-/* Repose le marqueur des qu'une ecriture reussit. Sans ce rattrapage, une
-   saisie faite sous le prefixe entre l'echec du marqueur et le lancement
-   suivant rendrait cet etat AMBIGU (copie prefixee recente vs ancienne
-   gelee) et l'app repasserait en mode ancien en masquant la saisie. */
-async function migFlagRetry(){
-  if(!MIGRATE_REPORT || !MIGRATE_REPORT.flagPending || !PROFILE_PREFIXED) return false;
-  MIGRATE_REPORT.flagPending = false;          // une seule tentative a la fois
-  let ok = false;
-  try{ ok = await migWriteFlags(); }catch(e){ ok = false; }
-  if(!ok) MIGRATE_REPORT.flagPending = true;   // on reessaiera a la prochaine ecriture reussie
-  return ok;
-}
-
-/* Verification rejouable, a la demande d'Enzo. Ne modifie RIEN : deux
-   lectures brutes et une comparaison de chaines. */
+/* Etat d'une cle DU POINT DE VUE D'ENZO : d'ou vient ce qu'il voit.
+   Reproduit exactement la decision de sget(), sans rien modifier :
+     fail-new    : copie du profil ILLISIBLE -> aucun repli, saisie refusee
+     same / diff : les deux copies existent -> c'est le profil qui est affiche
+     new-only    : copie du profil seule
+     new-oldfail : copie du profil affichee, ancienne illisible
+     removed     : retiree volontairement (pierre tombale) -> pas de repli
+     old         : repli en cours, c'est l'ancienne copie qui est affichee
+     fail-old    : rien sous le profil, et ancienne copie illisible
+     none        : absente des deux cotes */
 async function verifyProfileData(){
   const out = [];
-  for(let i = 0; i < MIGRATE_KEYS.length; i++){
-    const k = MIGRATE_KEYS[i];
-    const a = await rawGet(k);                 // ancienne cle
-    const b = await rawGet(profileKey(k));     // cle du profil
+  for(let i = 0; i < STORED_KEYS.length; i++){
+    const k = STORED_KEYS[i];
+    const b = await rawGet(profileKey(k));     // ce que l'app lit en premier
+    const a = await rawGet(k);                 // l'ancienne copie, gelee
+    const tomb = await tombHas(k);
     let state;
-    if(a.state === "fail" || b.state === "fail") state = "fail";
-    else if(a.state === "absent" && b.state === "absent") state = "none";
-    else if(a.state === "absent") state = "newonly";
-    else if(b.state === "absent") state = "missing";
-    else state = (a.value === b.value) ? "same" : "diff";
+    if(b.state === "fail") state = "fail-new";
+    else if(b.state === "ok"){
+      if(a.state === "ok")        state = (a.value === b.value) ? "same" : "diff";
+      else if(a.state === "fail") state = "new-oldfail";
+      else                        state = "new-only";
+    }
+    else if(tomb)                 state = "removed";
+    else if(a.state === "ok")     state = "old";
+    else if(a.state === "fail")   state = "fail-old";
+    else                          state = "none";
     out.push({
       key: k, state: state,
       oldLen: a.state === "ok" ? a.value.length : 0,
       newLen: b.state === "ok" ? b.value.length : 0,
-      oldCount: a.state === "ok" ? migCount(k, a.value) : "",
-      newCount: b.state === "ok" ? migCount(k, b.value) : ""
+      oldCount: a.state === "ok" ? storedCount(k, a.value) : "",
+      newCount: b.state === "ok" ? storedCount(k, b.value) : ""
     });
   }
   return out;
 }
 
-function migCause(rep){
-  const lbl = MIGRATE_LABEL[rep.key] || rep.key;
-  if(rep.reason === "read-old") return "impossible de lire « " + lbl + " » sur cet appareil.";
-  if(rep.reason === "read-new") return "impossible de lire la copie de « " + lbl + " » sous ton profil.";
-  if(rep.reason === "write")    return "le stockage de cet appareil a refusé d'écrire la copie de « " + lbl + " ».";
-  if(rep.reason === "verify")   return "la copie de « " + lbl + " » n'a pas pu être relue à l'identique.";
-  return "erreur inattendue pendant la migration.";
-}
-function migPuce(lbl, valeur){ return "\n· " + lbl + " : " + valeur; }
-
-/* Anomalie a porter dans #savealert (bandeau TRANSVERSAL, visible sur les
-   quatre onglets) : un message disant « tes données n'ont pas été migrées »
-   ne doit pas disparaitre quand Enzo change d'onglet. Le resume de REUSSITE,
-   lui, reste une carte discrete dans l'onglet Plan. */
-/* Rend {kind, title, head, todo} : `head` decrit la situation, `todo` dit
-   quoi faire. renderSaveBanner() glisse entre les deux la PORTEE exacte
-   (ce qui marche / ce qui est bloque), qui n'est connue qu'apres le
-   chargement des donnees. Les deux phrases ne doivent jamais se contredire
-   a la lecture. */
-function migAlert(rep){
-  if(!rep) return null;
-  if(rep.status === "failed"){
-    return {kind:"failed", title:"⚠ Migration des données — non effectuée",
-      head:"L'app continue de fonctionner sur tes anciennes données : rien n'a été supprimé, rien n'est perdu.\n"
-        + "Cause : " + migCause(rep),
-      todo:"Que faire : libère de l'espace sur ton iPhone et vérifie que tu n'es pas en navigation privée. L'app retentera d'elle-même au prochain lancement. En attendant, exporte tes données pour les mettre à l'abri."};
-  }
-  if(rep.status === "ambiguous"){
-    let t = "Une copie sous ton profil « " + PROFILE_ID + " » ne correspond pas à tes anciennes données, et le repère de fin de migration est absent. L'app ne choisit pas à ta place : elle continue sur tes anciennes données, et rien n'a été écrasé ni supprimé.\n"
-      + "Ce qu'il y a des deux côtés (anciennes données / copie sous le profil) :";
-    rep.diverged.forEach(function(d){
-      t += migPuce(MIGRATE_LABEL[d.key] || d.key, d.oldCount + " (" + d.oldLen + " car.) / " + d.newCount + " (" + d.newLen + " car.)");
-    });
-    return {kind:"ambiguous", title:"⚠ Deux versions de tes données — rien n'a été touché", head:t,
-      todo:"Ce que tu vois dans l'app, ce sont tes anciennes données. Que faire : exporte-les depuis l'onglet Journal, puis fais le point avant de continuer. L'onglet Zones → « Vérifier mes données » rejoue la comparaison quand tu veux."};
-  }
-  if(rep.status === "gap"){
-    let t = "La migration était terminée, mais une copie sous ton profil a disparu de cet appareil. Pour ces données, ce que l'app affiche est VIDE : ce n'est pas ton historique.\n"
-      + "Tes anciennes données, elles, sont toujours là :";
-    rep.gaps.forEach(function(g){
-      t += migPuce(MIGRATE_LABEL[g.key] || g.key, g.oldCount + (g.missing ? " (copie introuvable)" : " (copie illisible)"));
-    });
-    t += "\nRien n'a été supprimé.";
-    return {kind:"gap", noScope:true, title:"⚠ Une copie de tes données est introuvable", head:t,
-      todo:"Que faire : exporte ce qui est lisible, puis restaure ta dernière sauvegarde depuis l'onglet Journal."};
-  }
-  if(rep.status === "undetermined" && rep.gaps.length){
-    // Marqueur illisible ET copies introuvables : on ne sait pas si la
-    // migration a eu lieu. On ne conclut rien — mais on ne laisse surtout pas
-    // un ecran vide passer pour normal.
-    let t = "L'app n'a pas pu lire le repère qui indique si tes données ont déjà été recopiées sous ton profil, et certaines copies sont introuvables. Par précaution, rien n'a été recopié et rien n'a été supprimé.\n"
-      + "Ce qui s'affiche pour ces données est VIDE : ce n'est pas ton historique. Tes anciennes données, elles, sont toujours là :";
-    rep.gaps.forEach(function(g){
-      t += migPuce(MIGRATE_LABEL[g.key] || g.key, g.oldCount + (g.missing ? " (copie introuvable)" : " (copie illisible)"));
-    });
-    t += "\nPour ne rien écraser, toute saisie concernée est refusée.";
-    return {kind:"unknown", noScope:true, title:"⚠ État de tes données à vérifier", head:t,
-      todo:"Que faire : ce genre de panne de lecture est souvent passager, l'app revérifiera au prochain lancement. Si le message revient, exporte ce qui est lisible depuis l'onglet Journal."};
-  }
-  return null;
-}
-/* Portee exacte de l'incident, en deux phrases qui ne se contredisent pas :
-   ce qui est bloque, et sur quoi precisement — puis ce qui continue de
-   marcher. Sans cela, « tes prochaines saisies s'y ajoutent » et « toute
-   saisie est refusee » se lisaient a la suite. */
-function migScope(){
-  if(READ_BROKEN){
-    return "\nCe qui est bloqué : la saisie concernant " + brokenKeysLabel() + ", et rien d'autre. L'app la refuse pour ne pas écraser ce qu'elle n'a pas su lire — et ce qui s'affiche à cet endroit n'est pas ton historique réel.\n"
-      + "Ce qui marche : tout le reste — le plan, les séances, les courses, l'export.";
-  }
-  if(SAVE_FAILED) return "\nCe qui est bloqué : l'enregistrement de tes dernières modifications — elles sont affichées mais pas sauvegardées.";
-  return "\nCe qui marche : tout. Tes saisies continuent de s'enregistrer normalement.";
-}
 /* Construction par le DOM (jamais innerHTML) : ces lignes affichent des
    decomptes issus des donnees d'Enzo. */
-function migRow(list, label, detail, cls){
+function verifyRow(list, label, detail, cls){
   const li = document.createElement("li");
   if(cls) li.className = cls;
   const b = document.createElement("b"); b.textContent = label;
@@ -1235,44 +912,11 @@ function migRow(list, label, detail, cls){
   li.appendChild(b); li.appendChild(sp); list.appendChild(li);
 }
 
-function renderVerifyMode(){
+function renderProfileNote(){
   const el = $("verifymode"); if(!el) return;
-  el.textContent = PROFILE_PREFIXED
-    ? "Profil « " + PROFILE_ID + " ». Tes données sont enregistrées sous des clés préfixées. Les anciennes clés sont conservées telles quelles, plus rien ne les modifie."
-    : "Mode ancien : la migration n'a pas abouti sur cet appareil, l'app lit et écrit tes anciennes clés. Rien n'est perdu.";
-}
-
-/* Resume du PREMIER LANCEMENT apres migration. REUSSITE UNIQUEMENT : toute
-   anomalie passe par #savealert. Ne s'affiche jamais quand il n'y avait rien
-   a migrer, et ne liste QUE des lignes reellement comparees avec succes. */
-function renderMigCard(){
-  const card = $("migcard"); if(!card) return;
-  const rep = MIGRATE_REPORT; if(!rep) return;
-  const list = $("miglist"), foot = $("migfoot"), close = $("migclose");
-  while(list.firstChild) list.removeChild(list.firstChild);
-  if(rep.status !== "done" || !rep.copied){ card.classList.add("hidden"); return; }
-
-  $("migtitle").textContent = "Migration des données — terminée";
-  $("migtext").textContent = "Tes données ont été recopiées sous ton profil « " + PROFILE_ID + " », puis relues et comparées caractère par caractère. Les anciennes copies sont conservées sur cet appareil : rien n'a été supprimé.";
-  for(let i = 0; i < rep.keys.length; i++){
-    const r = rep.keys[i];
-    // « copied » = ecrite PUIS relue et comparee ; « identical » = comparee et
-    // deja identique. Toute autre action n'a PAS ete verifiee : elle ne
-    // s'affiche pas ici, et surtout jamais en vert.
-    if(r.action !== "copied" && r.action !== "identical") continue;
-    migRow(list, MIGRATE_LABEL[r.key] || r.key, r.count || "copiée", "same");
-  }
-  foot.textContent = "Tu peux le revérifier quand tu veux : onglet Zones → « Vérifier mes données »."
-    + (rep.flagPending ? " (Le repère de fin n'a pas pu être enregistré : l'app le reposera toute seule, tes copies sont bonnes.)" : "");
-  foot.classList.remove("hidden");
-  close.classList.remove("hidden");
-  card.classList.remove("hidden");
-}
-
-function renderMigrationUI(){
-  try{ renderVerifyMode(); }catch(e){}
-  try{ renderMigCard(); }catch(e){}
-  try{ renderSaveBanner(); }catch(e){}
+  el.textContent = "Profil « " + PROFILE_ID + " ». Tes données s'enregistrent sous des clés préfixées par ton profil. "
+    + "Tant qu'une donnée n'a pas été réécrite, l'app continue de lire ton ancienne copie : rien n'est déplacé d'avance. "
+    + "Tes anciennes clés ne sont jamais modifiées ni supprimées.";
 }
 
 let done = {};
@@ -2091,13 +1735,24 @@ $("planreset").addEventListener("click", async function(){
     toast("plan.json indisponible — plan importé conservé");
     return;
   }
-  await sdel("plan-override");
+  // sdel() ne rend true que si le retrait SURVIVRA au rechargement (copie
+  // prefixee supprimee ET pierre tombale enregistree). Sans elle, le repli
+  // rendrait l'ancien plan importe au prochain lancement : on ne peut pas
+  // annoncer « rétabli ✓ ».
+  const retire = await sdel("plan-override");
   try{ await sset("plan-cache", def); }catch(e){}
   applyPlan(def, "default");
   PLAN_PENDING_OVERRIDE = null;
   renderAll();
-  planMsg("Plan par défaut rétabli (v"+def.version+").", "ok");
-  toast("Plan par défaut rétabli ✓");
+  if(retire){
+    planMsg("Plan par défaut rétabli (v"+def.version+").", "ok");
+    toast("Plan par défaut rétabli ✓");
+  } else {
+    planMsg("Plan par défaut affiché (v"+def.version+") MAIS le retrait de ton plan importé N'A PAS ÉTÉ ENREGISTRÉ : le stockage de cet appareil a refusé d'écrire.\n"
+      + "Ton plan importé réapparaîtra au prochain lancement. Libère de l'espace (Réglages › Safari › Données de sites), sors de la navigation privée, puis recommence.\n"
+      + "Tes coches, ton journal et tes courses ne sont pas concernés.", "err");
+    toast("⚠ Retrait NON enregistré — ton plan importé reviendra au prochain lancement. Libère de l'espace.", 7000);
+  }
 });
 
 $("planfile").addEventListener("change", function(){
@@ -2127,16 +1782,27 @@ $("savealert-export").addEventListener("click", function(){
 
 /* ======================================================================
    « Vérifier mes données » (onglet Zones) — rejouable a tout moment.
-   Relit l'ANCIENNE cle et la NOUVELLE et les compare caractere pour
-   caractere. Ne modifie rien, ne supprime rien, n'appelle pas le reseau.
+   Ne modifie rien, ne supprime rien, n'appelle pas le reseau.
+   Chaque ligne dit D'ABORD d'ou vient ce que l'app affiche, puis le
+   decompte, puis la comparaison quand elle a un sens.
+   AUCUN JUGEMENT : une difference entre la copie du profil et l'ancienne
+   copie gelee est l'etat NORMAL des qu'une donnee a ete reecrite. Seule une
+   lecture en echec est signalee en orange.
    ====================================================================== */
 function verifyDetail(r){
-  if(r.state === "fail")    return "illisible sur cet appareil";
-  if(r.state === "none")    return "absente des deux côtés";
-  if(r.state === "newonly") return "aucune ancienne clé · profil : " + r.newCount + " (" + r.newLen + " car.)";
-  if(r.state === "missing") return "pas de copie sous le profil · ancienne : " + r.oldCount + " (" + r.oldLen + " car.)";
-  if(r.state === "diff")    return "DIFFÉRENT · ancienne : " + r.oldCount + " (" + r.oldLen + " car.) · profil : " + r.newCount + " (" + r.newLen + " car.)";
-  return "identique · " + r.newCount + " · " + r.newLen + " caractères";
+  const prof = r.newCount + " (" + r.newLen + " car.)";
+  const anc  = r.oldCount + " (" + r.oldLen + " car.)";
+  if(r.state === "fail-new")    return "illisible sous ton profil — l'app n'affiche rien ici et refuse la saisie";
+  if(r.state === "fail-old")    return "rien sous ton profil, et ton ancienne copie est illisible sur cet appareil";
+  if(r.state === "same")        return "ton profil · " + prof + " · identique à ton ancienne copie, caractère pour caractère";
+  if(r.state === "diff")        return "ton profil · " + prof + " · différent de ton ancienne copie figée : " + anc
+                                       + (r.oldLen === r.newLen ? " — même longueur, contenu différent" : "");
+  if(r.state === "new-only")    return "ton profil · " + prof + " · pas d'ancienne copie";
+  if(r.state === "new-oldfail") return "ton profil · " + prof + " · ancienne copie illisible sur cet appareil";
+  if(r.state === "old")         return "ton ancienne copie · " + anc + " · rien n'est encore écrit sous ton profil";
+  if(r.state === "removed")     return "retirée volontairement · l'app n'affiche rien ici"
+                                       + (r.oldCount ? " · ancienne copie conservée : " + anc : "");
+  return "absente des deux côtés";
 }
 async function runVerify(){
   const list = $("verifylist"), msg = $("verifymsg"), btn = $("verifydata");
@@ -2155,35 +1821,42 @@ async function runVerify(){
     msg.textContent = "Vérification impossible : le stockage de cet appareil n'a pas répondu. Tes données ne sont pas modifiées pour autant.";
     return;
   }
-  let same = 0, diff = 0, missing = 0, fail = 0;
+  let same = 0, diff = 0, fail = 0, viaProfil = 0, viaAncienne = 0;
   for(let i = 0; i < rows.length; i++){
     const r = rows[i];
-    if(r.state === "same") same++;
-    else if(r.state === "diff") diff++;
-    else if(r.state === "missing") missing++;
-    else if(r.state === "fail") fail++;
-    const cls = (r.state === "same") ? "same" : ((r.state === "diff" || r.state === "missing" || r.state === "fail") ? "diff" : "");
-    migRow(list, MIGRATE_LABEL[r.key] || r.key, verifyDetail(r), cls);
+    if(r.state === "same"){ same++; viaProfil++; }
+    else if(r.state === "diff"){ diff++; viaProfil++; }
+    else if(r.state === "new-only" || r.state === "new-oldfail") viaProfil++;
+    else if(r.state === "old") viaAncienne++;
+    else if(r.state === "fail-new" || r.state === "fail-old") fail++;
+    // L'orange ne signale QUE ce qui n'a pas pu etre lu. Une difference est
+    // un etat normal : elle reste en gris, sans emphase.
+    const cls = (r.state === "same") ? "same" : ((r.state === "fail-new" || r.state === "fail-old") ? "diff" : "");
+    verifyRow(list, STORED_LABEL[r.key] || r.key, verifyDetail(r), cls);
   }
   let heure = "";
   try{ heure = new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}); }catch(e){}
   const quand = heure ? (" Vérifié à " + heure + ".") : "";
+  const provenance = "L'app affiche " + viaProfil + " donnée" + (viaProfil>1?"s":"") + " depuis ton profil et "
+    + viaAncienne + " depuis ton ancienne copie.";
   if(fail){
     msg.className = "note diffmsg";
-    msg.textContent = fail + " clé" + (fail>1?"s":"") + " n'a pas pu être lue sur cet appareil. Rien n'est modifié." + quand;
-  } else if(diff || missing){
-    msg.className = "note diffmsg";
-    msg.textContent = (diff + missing) + " écart" + ((diff+missing)>1?"s":"") + " entre tes anciennes clés et leur copie. Tes anciennes clés sont intactes : exporte tes données depuis l'onglet Journal avant toute autre manipulation." + quand;
+    msg.textContent = fail + " donnée" + (fail>1?"s":"") + " n'a pas pu être lue sur cet appareil. Rien n'est modifié, et la saisie correspondante est refusée." + quand;
   } else if(same){
     msg.className = "note okmsg";
-    msg.textContent = same + " clé" + (same>1?"s":"") + " comparée" + (same>1?"s":"") + ", identique" + (same>1?"s":"") + " caractère pour caractère. Les anciennes clés sont intactes." + quand;
+    msg.textContent = provenance + " " + same + " comparée" + (same>1?"s":"") + " caractère pour caractère avec l'ancienne copie : identique" + (same>1?"s":"") + "." + quand;
+  } else if(viaProfil || viaAncienne){
+    msg.className = "note";
+    msg.textContent = provenance + " Tes anciennes clés sont conservées telles quelles." + quand;
   } else {
     msg.className = "note";
-    msg.textContent = "Aucune donnée à comparer sur cet appareil." + quand;
+    msg.textContent = "Aucune donnée enregistrée sur cet appareil." + quand;
   }
 }
-$("migclose").addEventListener("click", function(){ $("migcard").classList.add("hidden"); });
 $("verifydata").addEventListener("click", function(){ runVerify(); });
+/* Le libelle de provenance ne depend d'aucun chargement : il est pose des
+   l'evaluation du script, meme si init() echoue plus loin. */
+try{ renderProfileNote(); }catch(e){}
 
 /* ======================================================================
    STRAVA — etape A : connexion OAuth uniquement.
@@ -2417,10 +2090,15 @@ try{
     STRAVA_STATE = "off"; STRAVA_SINCE = "";
     // Le cache d'activites est jetable : on le purge, il n'est plus a jour.
     // Aucune donnee utilisateur n'est touchee.
-    try{ await stravaCacheClear(); }catch(e){}
+    let purge = false;
+    try{ purge = await stravaCacheClear(); }catch(e){ purge = false; }
     try{ stravaRerender(); }catch(e){}
     renderStravaCard();
-    stravaMsg("Strava déconnecté.", "ok");
+    // La deconnexion cote serveur a bien eu lieu : on ne la remet pas en
+    // cause. Mais si le cache local n'a pas pu etre purge durablement, on ne
+    // laisse pas croire que tout est net.
+    if(purge) stravaMsg("Strava déconnecté.", "ok");
+    else stravaMsg("Strava déconnecté côté serveur. En revanche, le cache local de tes sorties n'a pas pu être effacé durablement : d'anciennes activités peuvent réapparaître au prochain lancement. Libère de l'espace sur cet appareil.", "err");
   });
 }catch(e){ /* la carte Strava ne doit jamais empecher l'app de demarrer */ }
 
@@ -2818,9 +2496,11 @@ async function stravaCacheLoad(){
     acts: acts, byDay: stravaIndex(acts)
   };
 }
+/* Rend false si la purge ne survivra pas au rechargement : sans pierre
+   tombale, le repli ferait revenir un ancien cache gele apres deconnexion. */
 async function stravaCacheClear(){
   STRAVA_ACTS = null;
-  try{ await sdel(STRAVA_CACHE_KEY); }catch(e){}
+  try{ return await sdel(STRAVA_CACHE_KEY); }catch(e){ return false; }
 }
 
 /* ---------- reseau ----------------------------------------------------- */
@@ -3086,20 +2766,9 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
   try{
     $("prevwk").addEventListener("click", ()=>{ if(curWk>0){curWk--; renderWeek();} });
     $("nextwk").addEventListener("click", ()=>{ if(curWk<WEEKS.length-1){curWk++; renderWeek();} });
-    // Migration vers les cles prefixees par profil. AVANT tout chargement de
-    // donnees : les sget() qui suivent doivent deja viser les bonnes cles.
-    // Purement locale, aucun appel reseau — l'app reste pleinement
-    // fonctionnelle hors-ligne — et elle ne peut jamais empecher le demarrage.
-    try{ MIGRATE_REPORT = await migrateProfileStorage(); }
-    catch(e){ MIGRATE_REPORT = {status:"failed", reason:"exception", key:"", keys:[], copied:0, oldSeen:0, gaps:[], diverged:[], flagPending:false}; }
-    // MODE ANCIEN dans DEUX cas seulement : la copie (ou sa verification) a
-    // echoue, ou l'etat est ambigu. Dans ces deux cas ce sont les anciennes
-    // cles qui font foi. Un marqueur qu'on n'a pas su poser alors que toutes
-    // les copies sont verifiees ne fait PAS basculer : ce serait renvoyer
-    // Enzo sur des donnees que l'app ne modifie plus.
-    if(MIGRATE_REPORT.status === "failed" || MIGRATE_REPORT.status === "ambiguous") PROFILE_PREFIXED = false;
-    MIG_ALERT = migAlert(MIGRATE_REPORT);
-    renderMigrationUI();
+    // Aucune etape de migration : sget() lit la cle prefixee et se replie de
+    // lui-meme sur l'ancienne cle quand elle est ABSENTE. Rien a preparer,
+    // rien qui puisse echouer avant le chargement des donnees.
     const d0 = await sget("tgcm-done", {});   done     = isPlainObject(d0) ? d0 : {};
     const r0 = await sget("tgcm-races", []);  userRaces = Array.isArray(r0) ? r0 : [];
     const l0 = await sget("tgcm-log", {});    log      = isPlainObject(l0) ? l0 : {};
@@ -3108,18 +2777,6 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
     if(!isPlainObject(d0)) readFailed["tgcm-done"]  = true;
     if(!Array.isArray(r0)) readFailed["tgcm-races"] = true;
     if(!isPlainObject(l0)) readFailed["tgcm-log"]   = true;
-    // Copie annoncee par le marqueur mais introuvable ou illisible : on ne
-    // laisse PAS l'app presenter un etat vide comme s'il etait normal. On
-    // reutilise le mecanisme existant, deja eprouve : cle marquee illisible
-    // -> saisie refusee, export marque incomplet, bandeau explicite.
-    if(MIGRATE_REPORT && MIGRATE_REPORT.gaps){
-      // Seules les cles utilisateur ont un chemin de saisie a proteger.
-      // `strava-key` est decisive pour la migration, mais la marquer illisible
-      // n'aurait aucun effet utile : elle ne passe pas par saveUser().
-      MIGRATE_REPORT.gaps.forEach(function(g){
-        if(USER_KEYS.indexOf(g.key) >= 0) readFailed[g.key] = true;
-      });
-    }
     noteReadFailures();
     // Cache Strava : lecture LOCALE (jamais reseau) avant le premier rendu, pour
     // que les coches deduites soient la des l'ouverture, sans clignotement.
