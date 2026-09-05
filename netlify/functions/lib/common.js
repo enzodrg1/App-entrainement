@@ -22,6 +22,13 @@
      regeneree, jamais retrouvee.
    - ADMIN_KEY (variable d'environnement) protege la seule fonction
      d'administration. Ce n'est ni un profil, ni une cle d'acces aux donnees.
+   - INVITATIONS (etape 3). Une invitation est le SEUL objet qu'un appelant
+     non authentifie peut presenter. Elle n'est pas une cle : elle ne donne
+     acces a aucune donnee, elle autorise seulement la REMISE d'une cle pour
+     le profil qu'elle designe. Elle est a usage unique, datee, et n'est
+     stockee que sous forme de condensat. C'est aussi la seule voie par
+     laquelle un identifiant de profil provient d'ailleurs que d'une cle --
+     et il vient du document d'invitation, jamais de l'appelant.
    ===================================================================== */
 const crypto = require('crypto');
 
@@ -269,6 +276,26 @@ async function readProfile(event, profileId) {
   if (doc.id !== profileId) return null;
   return doc;
 }
+/* Lecture d'un profil AVEC distinction entre « absent » et « present mais
+   illisible ». readProfile() rend null dans les deux cas, ce qui convient
+   partout ou l'on cherche seulement a authentifier -- mais PAS a 'join', qui
+   CREE le profil quand il n'existe pas : confondre les deux faisait recreer,
+   avec active:true et un created_at neuf, un profil qu'Enzo avait desactive
+   et dont le document s'etait abime. Sur ce chemin, un document present et
+   invalide n'est JAMAIS reecrit. */
+async function readProfileState(event, profileId) {
+  if (!isProfileId(profileId)) return { state: 'absent', doc: null };
+  const doc = await withStore(event, async function (st) {
+    return await st.get(PROFILE_PREFIX + profileId, { type: 'json' });
+  });
+  if (doc === null || doc === undefined) return { state: 'absent', doc: null };
+  /* L'identifiant PORTE PAR LE DOCUMENT doit coincider avec celui du chemin :
+     un document copie sous un autre chemin ne doit pas pouvoir se faire
+     passer pour un autre profil -- et il ne doit pas non plus se faire
+     effacer par une recreation. */
+  if (!validProfileDoc(doc) || doc.id !== profileId) return { state: 'invalid', doc: null };
+  return { state: 'ok', doc: doc };
+}
 async function writeProfile(event, doc) {
   assertProfileId(doc && doc.id);
   return withStore(event, function (st) { return st.setJSON(PROFILE_PREFIX + doc.id, doc); });
@@ -288,6 +315,167 @@ async function listProfiles(event) {
   }
   out.sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
   return out;
+}
+
+/* ---------- nom d'affichage ----------
+   Valide pour TOUTE origine, y compris publique (fonction de remise
+   d'invitation) : c'est la seule chaine qu'un utilisateur non administrateur
+   peut faire entrer dans un document de profil.
+   REGLES : longueur bornee EN POINTS DE CODE (une chaine d'emoji ne doit pas
+   pouvoir tenir 40 unites UTF-16 et 10 caracteres visibles), aucun caractere
+   de controle C0/C1, aucun chevron -- ainsi aucune balise ne peut exister,
+   meme si un futur rendu oubliait textContent --, aucun caractere de
+   formatage invisible (espaces de largeur nulle, marques bidirectionnelles)
+   qui permettrait de deguiser un nom en un autre.
+   L'apostrophe et les accents restent ACCEPTES : un nom francais legitime ne
+   doit pas etre refuse, et le rendu se fait par textContent. */
+const DISPLAY_NAME_MAX = 40;
+/* Points de code REFUSES. La regle est « rien d'invisible, rien qui puisse
+   deguiser un nom en un autre ». La premiere version en laissait passer
+   l'essentiel -- toute la zone a usage prive, les etiquettes du plan 14, et
+   jusqu'a U+061C, une marque bidi que la regle pretendait pourtant bloquer.
+   Les ESPACES legitimes (U+00A0, U+2000-200A, U+202F, U+205F, U+3000...) ne
+   sont deliberement PAS ici : ils sont reduits a une espace ordinaire par
+   cleanDisplayName, ce qui est le bon traitement pour eux. */
+function badNameCodePoint(c) {
+  if (c < 32 || c === 127) return true;                       // controles C0 + DEL
+  if (c >= 0x80 && c <= 0x9f) return true;                    // controles C1
+  if (c === 0x3c || c === 0x3e) return true;                  // chevrons
+  if (c === 0xad) return true;                                // trait d'union conditionnel, invisible
+  if (c === 0x61c) return true;                               // ARABIC LETTER MARK : marque bidi
+  if (c === 0x115f || c === 0x1160) return true;              // remplisseurs jamo, larges et vides
+  if (c === 0x17b4 || c === 0x17b5) return true;              // voyelles khmeres inherentes, invisibles
+  if (c === 0x180e) return true;                              // separateur de voyelle mongol
+  if (c >= 0x200b && c <= 0x200f) return true;                // largeur nulle + marques bidi
+  if (c >= 0x202a && c <= 0x202e) return true;                // encadrements bidi
+  if (c >= 0x2060 && c <= 0x206f) return true;                // jointures, isolats bidi, formats obsoletes
+  if (c === 0x3164 || c === 0xffa0) return true;              // remplisseurs hangul, vides
+  if (c >= 0xd800 && c <= 0xdfff) return true;                // demi-paire isolee
+  if (c >= 0xe000 && c <= 0xf8ff) return true;                // usage prive (plan 0)
+  if (c >= 0xfdd0 && c <= 0xfdef) return true;                // non-caracteres
+  if (c >= 0xfe00 && c <= 0xfe0f) return true;                // selecteurs de variante, invisibles
+  if (c >= 0xfff9 && c <= 0xfffc) return true;                // annotations interlineaires + U+FFFC, invisibles
+  if (c === 0xfeff) return true;                              // espace insecable de largeur nulle
+  if (c >= 0x1d173 && c <= 0x1d17a) return true;              // formats musicaux, invisibles
+  if (c >= 0xe0000 && c <= 0xe0fff) return true;              // etiquettes et selecteurs du plan 14
+  if (c >= 0xf0000 && c <= 0x10fffd) return true;             // usage prive (plans 15 et 16)
+  if ((c & 0xfffe) === 0xfffe) return true;                   // non-caracteres U+xFFFE / U+xFFFF
+  return false;
+}
+function cleanDisplayName(v) {
+  if (typeof v !== 'string') return null;
+  let s = v;
+  try { s = s.normalize('NFC'); } catch (e) { /* normalisation indisponible : la validation suit */ }
+  /* ORDRE : ON CONTROLE D'ABORD, ON REDUIT ENSUITE. En JavaScript, \s couvre
+     U+FEFF, U+2028, U+2029, U+00A0, U+202F... : reduire les espaces avant
+     d'examiner les points de code transformait un caractere INTERDIT en
+     espace ordinaire, et le nom passait la validation. */
+  const raw = Array.from(s);
+  for (let i = 0; i < raw.length; i++) {
+    if (badNameCodePoint(raw[i].codePointAt(0))) return null;
+  }
+  s = s.replace(/\s+/g, ' ').trim();                          // espaces reduits, jamais de tabulation
+  if (!s) return null;
+  if (Array.from(s).length > DISPLAY_NAME_MAX) return null;   // borne APRES reduction
+  return s;
+}
+
+/* ---------- materiel de cle neuf ----------
+   Le secret en clair ne sort d'ici que par la valeur de retour, et n'est
+   destine qu'au corps d'UNE reponse, une seule fois. Jamais journalise.
+   assertProfileId est une barriere de plus : une cle ne peut pas se former
+   autour d'un identifiant qui n'aurait pas le droit de nommer des donnees. */
+async function freshKey(id) {
+  const secret = generateSecret();
+  const material = await hashSecret(secret);
+  return { key: assertProfileId(id) + '.' + secret, material: material };
+}
+
+/* ---------- invitations a usage unique (chantier 3, etape 3) ----------
+   POURQUOI. Enzo ne peut pas transmettre une cle d'acces par SMS a chaque
+   ami : elle est longue, definitive, et une faute de frappe y est
+   indiscernable d'un refus. Une invitation est un jeton JETABLE, court,
+   date, qui ne donne acces a RIEN par lui-meme : il ne fait qu'autoriser la
+   REMISE d'une cle pour UN profil donne.
+
+   CE QUI EST STOCKE. Le code n'est ecrit NULLE PART en clair : la cle de
+   stockage est son condensat SHA-256, et le document ne contient que
+   l'identifiant de profil vise, une expiration et des horodatages. Un code
+   de 120 bits n'a pas besoin de scrypt -- il n'est pas devinable, et le
+   cout d'un scrypt sur cette voie publique serait un levier de deni de
+   service. Le condensat est un SEGMENT DE CHEMIN : sa forme est revalidee
+   au point de construction de la cle, comme pour les profils et les nonces.
+
+   USAGE UNIQUE. La consommation precede TOUJOURS la generation de la cle.
+   Faute de comparaison-et-echange atomique dans @netlify/blobs 8.x (set()
+   ne rend rien et n'accepte pas d'etag), l'unicite repose sur DEUX
+   barrieres :
+     1. REVENDICATION PAR RELECTURE. On ecrit un jeton de revendication
+        aleatoire dans le document, puis on le relit : seul celui qui se
+        relit gagne. La fenetre de course tombe a l'ecart entre une ecriture
+        et une lecture, au lieu de couvrir tout le calcul scrypt.
+     2. STRUCTURELLE, et celle-la ne peut pas echouer : un document de
+        profil ne porte QU'UN sel et QU'UN condensat. Meme si deux remises
+        simultanees passaient toutes deux la barriere 1, la derniere
+        ecriture gagne et il n'existe, a la fin, qu'UNE SEULE cle valide.
+        La perdante repart avec une cle qui ne fonctionne pas -- fail-closed,
+        jamais deux acces concurrents.
+   ---------------------------------------------------------------------- */
+const INVITE_PREFIX = 'invites/';
+const INVITE_CODE_BYTES = 15;                                   // 120 bits
+const INVITE_CODE_RE = /^[0-9abcdefghjkmnpqrstvwxyz]{20,64}$/;  // meme alphabet que les secrets
+const INVITE_HASH_RE = /^[0-9a-f]{64}$/;
+const INVITE_TTL_DAYS_DEFAULT = 7;
+const INVITE_TTL_DAYS_MAX = 30;
+
+function generateInviteCode() { return encodeSecret(crypto.randomBytes(INVITE_CODE_BYTES)); }
+function isInviteCode(v) { return typeof v === 'string' && INVITE_CODE_RE.test(v); }
+/* Un code recopie a la main arrive avec des espaces, des tirets de mise en
+   forme ou des majuscules. On normalise AVANT de valider : un code juste ne
+   doit pas etre refuse pour une raison de presentation. */
+function normalizeInviteCode(v) {
+  if (typeof v !== 'string') return '';
+  return v.trim().toLowerCase().replace(/[\s -]+/g, '');
+}
+function inviteHash(code) { return crypto.createHash('sha256').update(String(code), 'utf8').digest('hex'); }
+function assertInviteHash(v) {
+  if (typeof v !== 'string' || !INVITE_HASH_RE.test(v)) throw new Error('bad_invite');   // jamais la valeur
+  return v;
+}
+function inviteKey(hash) { return INVITE_PREFIX + assertInviteHash(hash); }
+
+/* Forme EXACTE du document range sous 'invites/<sha256(code)>' :
+     { v:1, profile:'<id>', exp:<ms epoch>, created_at, claim?, claimed_at? }
+   Aucun secret : ni le code, ni une cle, ni un condensat de cle. */
+function validInviteDoc(o) {
+  return !!(o && typeof o === 'object'
+    && o.v === 1
+    && isProfileId(o.profile)
+    && typeof o.exp === 'number' && Number.isFinite(o.exp));
+}
+async function writeInvite(event, hash, doc) {
+  const k = inviteKey(hash);
+  return withStore(event, function (st) { return st.setJSON(k, doc); });
+}
+async function readInvite(event, hash) {
+  const k = inviteKey(hash);
+  const doc = await withStore(event, async function (st) { return await st.get(k, { type: 'json' }); });
+  return validInviteDoc(doc) ? doc : null;
+}
+async function deleteInvite(event, hash) {
+  const k = inviteKey(hash);
+  return withStore(event, function (st) { return st.delete(k); });
+}
+/* Revendication : ecrit un jeton aleatoire dans le document, puis RELIT.
+   Renvoie true seulement si c'est bien notre jeton qui est en place. Un
+   document deja revendique (claim present) est refuse d'emblee : c'est la
+   trace d'une remise en cours ou aboutie. */
+async function claimInvite(event, hash, doc, nowIso) {
+  if (!validInviteDoc(doc) || doc.claim) return false;
+  const claim = crypto.randomBytes(16).toString('hex');
+  await writeInvite(event, hash, Object.assign({}, doc, { claim: claim, claimed_at: nowIso }));
+  const back = await readInvite(event, hash);
+  return !!(back && back.claim === claim);
 }
 
 function headerValue(event, name) {
@@ -1061,8 +1249,22 @@ module.exports = {
   hashSecret: hashSecret,
   publicProfile: publicProfile,
   readProfile: readProfile,
+  readProfileState: readProfileState,
   writeProfile: writeProfile,
   listProfiles: listProfiles,
+  cleanDisplayName: cleanDisplayName,
+  DISPLAY_NAME_MAX: DISPLAY_NAME_MAX,
+  freshKey: freshKey,
+  generateInviteCode: generateInviteCode,
+  isInviteCode: isInviteCode,
+  normalizeInviteCode: normalizeInviteCode,
+  inviteHash: inviteHash,
+  readInvite: readInvite,
+  writeInvite: writeInvite,
+  deleteInvite: deleteInvite,
+  claimInvite: claimInvite,
+  INVITE_TTL_DAYS_DEFAULT: INVITE_TTL_DAYS_DEFAULT,
+  INVITE_TTL_DAYS_MAX: INVITE_TTL_DAYS_MAX,
   parseStatePayload: parseStatePayload,
   isStoreError: isStoreError,
   storeFailure: storeFailure,

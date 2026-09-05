@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Aucun Referer sortant. Un lien d'invitation arrive sous la forme
+     `…/?invite=<code>` : sans cette ligne, la simple requete vers la police
+     Google emporterait le code dans un en-tete Referer, avant meme que le
+     script ait pu nettoyer l'URL. Les navigateurs recents tronquent deja le
+     Referer inter-origine, mais on ne fait pas dependre un secret d'un
+     defaut de navigateur. -->
+<meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#0E1B16">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -221,6 +228,27 @@ input.io::placeholder{color:var(--dim)}
    (sections Vigilance) : on ne l'utilise pas ici. L'orange ne signale que
    ce qui n'a PAS pu etre lu ; une difference entre les deux copies est un
    etat normal, elle reste en gris. */
+/* Ecran de premiere connexion. Sobre, opaque, plein ecran : il ne s'affiche
+   que sur un appareil sans profil identifiable, et disparait pour toujours
+   une fois l'invitation acceptee. */
+.join{position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto; -webkit-overflow-scrolling:touch;
+      padding:calc(30px + env(safe-area-inset-top)) 18px calc(30px + env(safe-area-inset-bottom))}
+.joinbox{max-width:520px; margin:0 auto}
+.joinbox h2{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:28px; line-height:1; margin:4px 0 10px}
+.joinlbl{display:block; font-size:12.5px; color:var(--muted); margin:14px 0 0}
+body.joining{overflow:hidden}
+/* Rappel de sauvegarde : une ligne de fait, pas une alerte. L'ambre reste
+   reserve aux points de vigilance sante et au bandeau de stockage. */
+.backupnote{display:flex; align-items:center; gap:4px; margin:10px 18px 0; padding:0 4px 0 10px;
+            background:var(--panel); border:1px solid var(--line); border-radius:10px;
+            font-size:12.5px; line-height:1.4; color:var(--muted)}
+.backupnote span{flex:1 1 auto; min-width:0; padding:8px 0}
+/* Cibles tactiles : 44 x 44 au minimum, sur un ecran de telephone tenu d'une
+   main. Le remplissage vertical de la ligne vient des boutons eux-memes. */
+.backupnote button{flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+                   min-width:44px; min-height:44px; padding:0 6px;
+                   font-size:12.5px; font-weight:600; color:var(--moss)}
+.backupnote button.x{color:var(--dim); font-size:19px; line-height:1; padding:0}
 .vlist{margin:8px 0 0; padding:0; list-style:none}
 .vlist li{display:flex; justify-content:space-between; gap:12px; font-size:13px; line-height:1.5; margin-bottom:4px}
 .vlist li b{font-weight:600; color:var(--ink); min-width:0; overflow-wrap:break-word}
@@ -232,6 +260,28 @@ input.io::placeholder{color:var(--dim)}
 </style>
 </head>
 <body>
+
+<!-- Ecran de premiere connexion (chantier 3, etape 3).
+     Il n'apparait QUE sur un appareil dont aucun profil n'a pu etre
+     identifie : jamais sur celui d'Enzo, jamais apres une premiere connexion
+     reussie. C'est le seul et unique moment ou l'app a besoin du reseau. -->
+<div class="join hidden" id="joinscreen" role="dialog" aria-modal="true" aria-labelledby="jointitle">
+  <div class="joinbox">
+    <div class="eyebrow">Première connexion</div>
+    <h2 id="jointitle">Rejoindre l'app</h2>
+    <p class="note" style="margin-top:0">Cet appareil n'est rattaché à aucun profil. Ouvre le <b>lien d'invitation</b> qu'Enzo t'a envoyé — le code se remplit tout seul — ou saisis-le à la main ci-dessous.</p>
+    <p class="note hidden" id="joinlegacy"></p>
+    <label class="joinlbl" for="joincode">Code d'invitation</label>
+    <input class="io" type="text" id="joincode" placeholder="Le code reçu d'Enzo" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="joinlbl" for="joinname">Ton prénom</label>
+    <input class="io" type="text" id="joinname" placeholder="Affiché dans l'app" autocomplete="off" spellcheck="false" maxlength="40">
+    <button class="btn primary" id="joingo" type="button" style="width:100%; margin-top:14px">Rejoindre</button>
+    <div class="note plan-msg hidden" id="joinmsg"></div>
+    <button class="btn ghost hidden" id="joinforce" type="button" style="width:100%; margin-top:10px">Continuer sans enregistrer</button>
+    <p class="note">Le code ne sert <b>qu'une fois</b> et n'ouvre l'accès qu'à ton propre profil : ton plan, ton journal, tes courses. Personne d'autre ne les voit.</p>
+    <p class="note">Une connexion internet est nécessaire pour cette étape, et pour elle seule. Ensuite l'app fonctionne hors-ligne, comme d'habitude.</p>
+  </div>
+</div>
 
 <div class="savealert hidden" id="savealert" role="alert" aria-live="assertive">
   <div id="savealert-write">
@@ -255,6 +305,15 @@ input.io::placeholder{color:var(--dim)}
   <div class="progress" aria-hidden="true"><i id="progbar"></i></div>
   <div class="progress-lbl" id="proglbl"></div>
 </header>
+
+<!-- Rappel de sauvegarde. Ni alerte, ni compte a rebours : une ligne de fait,
+     refermable, affichee seulement si le dernier export date de plus d'un
+     mois ou n'a jamais eu lieu sur cet appareil. -->
+<div class="backupnote hidden" id="backupnote">
+  <span id="backuptext"></span>
+  <button type="button" id="backupgo">Exporter</button>
+  <button type="button" class="x" id="backupclose" aria-label="Masquer ce rappel">×</button>
+</div>
 
 <section id="page-plan">
   <div class="todaywrap"><div class="lbl">Aujourd'hui</div><div id="todaycard"></div></div>
@@ -517,15 +576,40 @@ let readFailed = {};
    ne porte pas le prefixe du profil — aucun chemin ne peut viser une
    ancienne cle en ecriture ou en suppression.
    ====================================================================== */
-const PROFILE_ID  = "enzo";   // etape 1 : profil unique, code en dur
+/* ETAPE 3 : l'identifiant n'est plus code en dur, il est DEDUIT au demarrage
+   (cf. « AMORCAGE DU PROFIL » plus bas). Vide = profil inconnu. On ne devine
+   JAMAIS : un profil inconnu ne lit pas, n'ecrit pas, et ne se replie pas sur
+   une ancienne cle. */
+let PROFILE_ID = "";
+/* Nom d'affichage, purement decoratif. Jamais un segment de chemin, jamais
+   un prefixe de cle : il ne sert qu'a ecrire « Profil Julie » au lieu de
+   « Profil julie ». Rendu par textContent, jamais par innerHTML. */
+let PROFILE_NAME = "";
 const PROFILE_SEP = ":";
+/* L'AMORCE. Elle ne peut evidemment pas etre prefixee par le profil : c'est
+   elle qui le donne. C'est la seule cle non prefixee que cette app ecrive,
+   elle ne contient qu'un identifiant, et elle n'est jamais indispensable
+   (l'amorcage sait aussi deduire le profil de la cle d'appareil deja
+   enregistree). */
+const PROFILE_ANCHOR_KEY = "profile-id";
+/* HERITAGE DES ANCIENNES CLES — le profil courant est-il le PROPRIETAIRE des
+   cles non prefixees restees sur cet appareil ?
+   Faux par defaut, et il le reste tant qu'une PREUVE ne dit pas le contraire
+   (cf. le bloc « A QUI SONT LES ANCIENNES CLES ? »). Consulte par sget() a
+   chaque repli : sans lui, n'importe quel profil lirait les seances, le
+   journal et les genes de la personne qui utilisait l'appareil avant lui. */
+const LEGACY_OWN_KEY = "legacy-owner";   // cle PREFIXEE : la reponse est par profil
+let LEGACY_OWNER = false;
 /* Seule fonction qui concatene le prefixe. Aucune autre dans le fichier. */
 function profileKey(k){ return PROFILE_ID + PROFILE_SEP + k; }
 /* GARDE STRUCTURELLE : un nom physique n'est MODIFIABLE que s'il porte le
    prefixe du profil. C'est ce qui rend impossible, par construction, qu'un
-   chemin quelconque ecrive ou supprime une ancienne cle. */
+   chemin quelconque ecrive ou supprime une ancienne cle.
+   PROFIL INCONNU : plus aucune ecriture n'est possible. Ce n'est pas une
+   precaution de confort — sans identifiant, on ne sait pas A QUI appartient
+   ce qu'on ecrirait. */
 function isProfileKey(phys){
-  return typeof phys === "string" && phys.indexOf(PROFILE_ID + PROFILE_SEP) === 0;
+  return !!PROFILE_ID && typeof phys === "string" && phys.indexOf(PROFILE_ID + PROFILE_SEP) === 0;
 }
 /* BACKEND UNIQUE, decide en UN SEUL endroit : window.storage n'est retenu
    que s'il sait LIRE ET ECRIRE. Un window.storage partiel (get sans set)
@@ -588,6 +672,20 @@ async function rawDel(phys){
     return true;
   }
   try{ localStorage.removeItem(phys); return true; }catch(e){}
+  return false;
+}
+/* SEULE ecriture hors prefixe de tout le fichier, et la garde qui la rend
+   sure n'est pas une verification mais une SIGNATURE : cette fonction ne
+   prend pas de nom de cle en parametre. Aucun chemin de code ne peut donc
+   s'en servir pour viser une ancienne cle — il n'y a rien a lui passer.
+   Elle n'ecrit qu'un identifiant de profil, jamais une donnee. */
+async function rawSetAnchor(str){
+  let st = null;
+  try{ st = winStore(); }catch(e){ return false; }
+  if(st){
+    try{ await st.set(PROFILE_ANCHOR_KEY, str); return true; }catch(e){ return false; }
+  }
+  try{ localStorage.setItem(PROFILE_ANCHOR_KEY, str); return true; }catch(e){}
   return false;
 }
 
@@ -660,14 +758,30 @@ function sgetFail(k, d){
 }
 async function sget(k, d){
   delete readFailed[k];
+  /* PROFIL INCONNU (amorcage en echec). On ne lit rien, et surtout on ne se
+     replie PAS sur l'ancienne cle : afficher l'historique d'Enzo sous un
+     profil qu'on n'a pas su identifier, ce serait presenter une donnee dont
+     on ignore le proprietaire — et la premiere ecriture la figerait ailleurs.
+     On marque une lecture en echec : la machinerie deja eprouvee (saisie
+     refusee, export marque incomplet, bandeau #savealert) prend le relais. */
+  if(!PROFILE_ID) return sgetFail(k, d);
   const cur = await rawGet(profileKey(k));
   if(cur.state === "ok"){
     try{ return JSON.parse(cur.value); }catch(e){ return sgetFail(k, d); }
   }
   // ILLISIBLE sous le profil : aucun repli (cf. l'en-tete de bloc).
   if(cur.state === "fail") return sgetFail(k, d);
-  // ABSENTE sous le profil : repli sur l'ancienne cle, sauf si elle a ete
-  // explicitement supprimee pour ce profil.
+  /* ABSENTE sous le profil. Le repli sur l'ancienne cle NON PREFIXEE n'est
+     ouvert qu'au profil qui en est PROPRIETAIRE. A l'etape 1, PROFILE_ID
+     valait toujours "enzo" et le repli etait donc sur par construction ;
+     depuis que le profil varie, replier sans regarder A QUI appartiennent ces
+     cles ferait lire a Julie les seances, les ressentis et les genes d'Enzo,
+     et sa PREMIERE ECRITURE les recopierait definitivement sous « julie: ».
+     Ce n'est pas une lecture en echec -- il n'y a rien a lire POUR CE PROFIL
+     --, donc pas de readFailed : la valeur par defaut est la bonne reponse. */
+  if(!LEGACY_OWNER) return d;
+  // Repli sur l'ancienne cle, sauf si elle a ete explicitement supprimee
+  // pour ce profil.
   if(await tombHas(k)) return d;
   const old = await rawGet(k);
   if(old.state === "ok"){
@@ -705,11 +819,312 @@ async function sdel(k){
 }
 
 /* ======================================================================
+   AMORCAGE DU PROFIL (chantier 3, etape 3)
+
+   LE RISQUE, ecrit noir sur blanc : l'appareil d'Enzo porte 30 seances
+   cochees et 25 entrees de journal sous le prefixe `enzo:`. Les chercher
+   sous un autre prefixe -- ou sous aucun -- les rendrait invisibles en un
+   lancement. C'est le seul point de ce chantier qui puisse detruire un
+   historique, et il ne se rattrape pas.
+
+   LA REGLE : ON NE DEVINE JAMAIS. Le profil se DEDUIT de ce qui est deja
+   ecrit sur l'appareil, dans cet ordre :
+
+     1. L'ANCRE `profile-id`, cle non prefixee ecrite au moment de rejoindre,
+        et re-ecrite apres une deduction reussie.
+     2. LA CLE D'APPAREIL DEJA PREFIXEE. Le telephone d'Enzo contient
+        `enzo:strava-key`. Le prefixe physique EST l'identifiant : c'est
+        litteralement l'endroit ou ses donnees sont rangees. On l'enumere,
+        on ne le suppose pas.
+     3. L'ANCIENNE CLE D'APPAREIL NON PREFIXEE `strava-key`, dont la valeur
+        a la forme `<profil>.<secret>` : le segment avant le premier point
+        est l'identifiant. Voie de secours pour un stockage qui ne sait pas
+        s'enumerer.
+
+   LE PIEGE, ET IL A DEJA COUTE CINQ PASSES DE TEST A L'ETAPE 1 : une
+   LECTURE EN ECHEC N'EST PAS UNE ABSENCE. Si l'une des trois lectures
+   echoue et qu'aucun profil n'a ete trouve, la reponse est « je ne sais
+   pas » (`fail`), JAMAIS « pas de profil » (`none`). La difference est
+   entiere : `none` affiche l'ecran de premiere connexion, `fail` ne
+   l'affiche pas et n'ecrit rien. Conclure « appareil neuf » sur un stockage
+   muet, c'est proposer a Enzo de rejoindre par-dessus son propre historique.
+
+   AUCUNE ECRITURE sur les chemins d'echec. La seule ecriture possible est
+   l'ancre, et seulement APRES une deduction reussie.
+   ====================================================================== */
+/* Meme grammaire que le serveur (common.js, isProfileId) : c'est ce qui
+   garantit qu'un identifiant deduit ici saura nommer des donnees la-bas. */
+const PROFILE_ID_RE = /^[a-z0-9][a-z0-9-]{1,23}$/;
+function validProfileId(v){
+  if(typeof v !== "string" || v.length > 24 || !PROFILE_ID_RE.test(v)) return false;
+  // 'constructor' passe l'alphabet mais est un nom herite d'Object.prototype.
+  if(Object.prototype.hasOwnProperty.call(Object.prototype, v)) return false;
+  return true;
+}
+/* L'ancre est ecrite en clair (`enzo`), mais une version anterieure ou un
+   outil tiers pourrait l'avoir posee en JSON (`"enzo"`). On accepte les deux
+   et on revalide toujours : une ancre abimee ne doit pas fabriquer un
+   prefixe fantaisiste. */
+function parseAnchor(raw){
+  let v = (raw === undefined || raw === null) ? "" : String(raw).trim();
+  if(v.charAt(0) === '"'){
+    try{ const j = JSON.parse(v); if(typeof j === "string") v = j.trim(); }catch(e){}
+  }
+  return validProfileId(v) ? v : "";
+}
+/* Identifiant porte par une cle d'appareil `<profil>.<secret>`. La valeur est
+   rangee en JSON par sset(), d'ou le decodage prealable. */
+function idFromDeviceKey(raw){
+  let v = raw;
+  try{ const j = JSON.parse(String(raw)); if(typeof j === "string") v = j; }catch(e){}
+  if(typeof v !== "string") return "";
+  const i = v.indexOf(".");
+  if(i <= 0) return "";
+  return validProfileId(v.slice(0, i)) ? v.slice(0, i) : "";
+}
+/* Les trois cles de donnees d'entrainement. MEME LISTE que USER_KEYS, repetee
+   ici parce que l'amorcage precede ce bloc dans le fichier : toute evolution
+   de l'une doit toucher l'autre. */
+const BOOT_DATA_KEYS = ["tgcm-done", "tgcm-log", "tgcm-races"];
+/* Suffixes qui, portes par un prefixe, prouvent qu'un profil VIT sur cet
+   appareil. La cle d'appareil ne suffisait pas : un profil qui n'a jamais
+   branche Strava n'en a pas, et ses seances cochees rangees sous
+   `<profil>:tgcm-done` restaient invisibles a l'amorcage -- l'ecran de
+   premiere connexion s'affichait alors sur un telephone plein d'historique,
+   sans le moindre avertissement. */
+const BOOT_SCAN_SUFFIXES = ["strava-key"].concat(BOOT_DATA_KEYS);
+/* Enumere les prefixes de profil presents sur l'appareil.
+   `failed` distingue « je n'ai pas su lire » de « il n'y a rien ».
+   window.storage n'expose pas forcement d'enumeration : son ABSENCE n'est pas
+   un echec (un appareil qui a rejoint porte toujours l'ancre), alors qu'une
+   enumeration qui LEVE en est un.
+   `ids`     : tout prefixe portant une cle d'appareil OU des donnees.
+   `dataIds` : ceux qui portent des DONNEES d'entrainement. */
+async function scanProfilePrefixes(){
+  const res = {ids:[], dataIds:[], failed:false};
+  let st = null;
+  try{ st = winStore(); }catch(e){ res.failed = true; return res; }
+  let names = null;
+  if(st){
+    if(typeof st.keys !== "function") return res;
+    try{ names = await st.keys(); }catch(e){ res.failed = true; return res; }
+  } else {
+    try{
+      names = [];
+      for(let i = 0; i < localStorage.length; i++) names.push(localStorage.key(i));
+    }catch(e){ res.failed = true; return res; }
+  }
+  if(!Array.isArray(names)){ res.failed = true; return res; }
+  for(let i = 0; i < names.length; i++){
+    const n = names[i];
+    if(typeof n !== "string") continue;
+    const j = n.indexOf(PROFILE_SEP);
+    if(j <= 0) continue;
+    const id = n.slice(0, j), suf = n.slice(j + 1);
+    if(!validProfileId(id)) continue;
+    if(BOOT_SCAN_SUFFIXES.indexOf(suf) < 0) continue;
+    if(res.ids.indexOf(id) < 0) res.ids.push(id);
+    if(BOOT_DATA_KEYS.indexOf(suf) >= 0 && res.dataIds.indexOf(id) < 0) res.dataIds.push(id);
+  }
+  res.ids.sort();
+  res.dataIds.sort();
+  return res;
+}
+/* Des donnees d'entrainement existent-elles sur cet appareil sans qu'AUCUN
+   profil ait pu leur etre rattache ? DEUX endroits, pas un seul :
+     - les ANCIENNES cles non prefixees, qui ne portent aucun identifiant ;
+     - des cles PREFIXEES ORPHELINES, c'est-a-dire un prefixe porteur de
+       donnees dont l'amorcage n'a pas fait un profil.
+   Le second cas ne devrait plus se produire depuis que le scan enumere les
+   cles de donnees : un prefixe porteur de donnees devient un profil, ou rend
+   l'amorcage ambigu. On le teste quand meme, c'est le dernier garde-fou
+   avant d'afficher un ecran de premiere connexion et il ne coute rien.
+   Ne sert QU'A AVERTIR : on ne deduit aucun profil de cette presence. */
+async function hasLegacyUserData(scan){
+  const res = {found:false, failed:false};
+  if(scan && Array.isArray(scan.dataIds) && scan.dataIds.length){ res.found = true; return res; }
+  for(let i = 0; i < BOOT_DATA_KEYS.length; i++){
+    let r;
+    try{ r = await rawGet(BOOT_DATA_KEYS[i]); }catch(e){ r = {state:"fail"}; }
+    if(r.state === "ok"){ res.found = true; return res; }
+    /* ECHEC DE LECTURE : ce n'est pas une absence. C'est le tout dernier
+       controle avant d'afficher l'ecran de premiere connexion -- s'il n'a pas
+       su lire, l'appareil n'est pas « reellement neuf », il est illisible. */
+    if(r.state === "fail") res.failed = true;
+  }
+  return res;
+}
+/* Ecrit l'ancre apres une deduction reussie, pour que les lancements suivants
+   n'aient plus rien a deduire. Best effort : un echec est sans consequence,
+   la deduction recommencera. */
+async function rememberProfile(id){
+  try{ return await rawSetAnchor(id); }catch(e){ return false; }
+}
+/* Renvoie {state:"ok"|"none"|"fail", id, source, upgrade, anchorMissing,
+   reason, ids, legacy}.
+   AUCUN appel reseau, ET AUCUNE ECRITURE : les marques (heritage puis ancre)
+   sont posees par l'appelant, une fois PROFILE_ID connu et dans cet ordre. */
+async function bootProfile(){
+  let hidden = false;   // au moins une lecture a echoue : une absence ne prouve plus rien
+
+  let anchor = {state:"fail", value:""};
+  try{ anchor = await rawGet(PROFILE_ANCHOR_KEY); }catch(e){ anchor = {state:"fail", value:""}; }
+  let anchorId = "";
+  if(anchor.state === "fail") hidden = true;
+  else if(anchor.state === "ok"){
+    anchorId = parseAnchor(anchor.value);
+    // Ancre presente mais illisible : ce n'est pas une absence non plus.
+    if(!anchorId) hidden = true;
+  }
+
+  /* Le scan tourne MEME quand l'ancre a repondu : il sert alors de
+     RECOUPEMENT. Une ancre « julie » sur un appareil dont toutes les donnees
+     sont rangees sous « enzo: » donnait une app vide et parfaitement muette
+     -- le pire des affichages, puisque rien n'y distingue « tu n'as pas de
+     donnees » de « tes donnees sont ailleurs ». */
+  let scan = {ids:[], dataIds:[], failed:true};
+  try{ scan = await scanProfilePrefixes(); }catch(e){ scan = {ids:[], dataIds:[], failed:true}; }
+  if(scan.failed) hidden = true;
+
+  const anchorMissing = (anchor.state === "absent");
+
+  if(anchorId){
+    if(!scan.failed && scan.ids.length && scan.ids.indexOf(anchorId) < 0){
+      /* L'identifiant enregistre ne nomme AUCUNE des donnees presentes. On ne
+         tranche pas : demarrer sous l'ancre ecrirait a cote d'un historique
+         bien visible, et adopter un prefixe trouve reviendrait a deviner. */
+      return {state:"fail", reason:"incoherent", id:anchorId, ids:scan.ids};
+    }
+    return {state:"ok", id:anchorId, source:"ancre", upgrade:false, anchorMissing:false};
+  }
+
+  if(scan.ids.length === 1){
+    /* CHEMIN DE MISE A JOUR : le profil est deduit de ce qui est DEJA range
+       sur l'appareil. Aucune invitation n'est passee par la. */
+    return {state:"ok", id:scan.ids[0], source:"prefixe present sur l'appareil",
+            upgrade:true, anchorMissing:anchorMissing};
+  }
+  if(scan.ids.length > 1){
+    // Plusieurs profils sur un meme appareil : aucun n'est « le bon » par
+    // defaut. On ne tranche pas a la place d'Enzo, et on n'ecrit rien.
+    return {state:"fail", reason:"ambigu", ids:scan.ids};
+  }
+
+  let legacyKey = {state:"fail", value:""};
+  try{ legacyKey = await rawGet("strava-key"); }catch(e){ legacyKey = {state:"fail", value:""}; }
+  if(legacyKey.state === "fail") hidden = true;
+  else if(legacyKey.state === "ok"){
+    const id = idFromDeviceKey(legacyKey.value);
+    if(id) return {state:"ok", id:id, source:"ancienne cle d'appareil",
+                   upgrade:true, anchorMissing:anchorMissing};
+  }
+
+  if(hidden) return {state:"fail", reason:"illisible"};
+
+  /* Dernier controle avant de conclure « appareil reellement neuf » : les
+     anciennes cles. Une seule lecture en echec ici et la conclusion tombe --
+     « none » affiche l'ecran de premiere connexion, et proposer de rejoindre
+     a quelqu'un dont on n'a pas su lire l'historique, c'est lui proposer de
+     passer par-dessus. */
+  let lu = {found:false, failed:true};
+  try{ lu = await hasLegacyUserData(scan); }catch(e){ lu = {found:false, failed:true}; }
+  if(lu.failed) return {state:"fail", reason:"illisible"};
+
+  // Tout a ete lu, et il n'y a rien : appareil reellement neuf.
+  return {state:"none", legacy:lu.found};
+}
+
+/* ======================================================================
+   A QUI SONT LES ANCIENNES CLES ? (chantier 3, etape 3)
+
+   Les cles non prefixees (« tgcm-done », « tgcm-log », « tgcm-races »,
+   « strava-key »...) ne portent AUCUN identifiant. Tant que PROFILE_ID valait
+   toujours "enzo", s'y replier etait sur par construction. Ce n'est plus le
+   cas : un appareil peut porter les anciennes cles d'Enzo ET voir quelqu'un
+   d'autre rejoindre dessus. Le repli doit donc etre RATTACHE A UN
+   PROPRIETAIRE, et l'affirmation doit etre ECRITE, pas rededuite a chaque
+   lecture -- la preuve d'origine disparait des qu'un second profil s'installe
+   sur l'appareil.
+
+   DEUX PREUVES, jamais une supposition :
+     1. UNE MARQUE PERSISTEE, « <profil>:legacy-owner », ecrite UNE SEULE FOIS
+        et jamais reecrite : true quand le profil a ete deduit de donnees DEJA
+        presentes sur l'appareil (chemin de mise a jour), false quand il a ete
+        etabli par une invitation (chemin « join »).
+     2. A DEFAUT SEULEMENT (marque absente ou abimee) : le chemin de mise a
+        jour de ce lancement, ou -- derniere preuve qui se suffit a
+        elle-meme -- l'ANCIENNE cle d'appareil non prefixee, dont la valeur
+        porte « <profil>.<secret> ». Si ce profil est le profil courant, les
+        anciennes cles sont bien les siennes : c'est litteralement sa cle qui
+        est rangee a cote d'elles.
+
+   TOUT LE RESTE VAUT « NON ». Un prefixe « julie: » ne prouve rien sur des
+   donnees qui n'en portent aucun.
+   ====================================================================== */
+async function resolveLegacyOwner(st){
+  let r = {state:"fail", value:""};
+  try{ r = await rawGet(profileKey(LEGACY_OWN_KEY)); }catch(e){ r = {state:"fail", value:""}; }
+  if(r.state === "ok"){
+    try{ const v = JSON.parse(r.value); if(v === true || v === false) return v; }catch(e){}
+  }
+  if(st && st.upgrade) return true;
+  let lk = {state:"fail", value:""};
+  try{ lk = await rawGet("strava-key"); }catch(e){ lk = {state:"fail", value:""}; }
+  if(lk.state === "ok" && idFromDeviceKey(lk.value) === PROFILE_ID) return true;
+  return false;
+}
+/* Ecrit la marque d'heritage. UNE SEULE FOIS : une marque deja posee n'est
+   jamais revue -- la question « ces anciennes cles sont-elles les tiennes ? »
+   se tranche au premier lancement, pas a chaque lancement. Une marque
+   ILLISIBLE n'est pas ecrasee : on ne recouvre pas une reponse qu'on n'a pas
+   su lire. */
+async function rememberLegacyOwner(v){
+  let r = {state:"fail", value:""};
+  try{ r = await rawGet(profileKey(LEGACY_OWN_KEY)); }catch(e){ r = {state:"fail", value:""}; }
+  if(r.state === "ok") return true;
+  if(r.state === "fail") return false;
+  return await rawSet(profileKey(LEGACY_OWN_KEY), JSON.stringify(!!v));
+}
+/* ORDRE IMPOSE : la marque d'heritage D'ABORD, l'ancre ENSUITE. L'ancre est
+   ce qui dispense les lancements suivants de toute deduction ; la poser sans
+   la marque laisserait un profil identifie dont on ne saurait plus, au
+   lancement suivant, s'il herite ou non. */
+async function persistBootMarks(st, owner){
+  let ok = false;
+  try{ ok = await rememberLegacyOwner(owner); }catch(e){ ok = false; }
+  if(!ok) return false;
+  if(st && st.anchorMissing){ try{ await rememberProfile(PROFILE_ID); }catch(e){} }
+  return true;
+}
+
+/* Code d'invitation porte par l'URL (`…/?invite=<code>`).
+   LU ET RETIRE IMMEDIATEMENT, avant tout affichage et quel que soit l'etat du
+   profil : un code ne doit rester ni dans la barre d'adresse, ni dans
+   l'historique, ni dans un lien qu'on repartagerait plus tard. */
+let INVITE_FROM_URL = "";
+(function readInviteParam(){
+  try{
+    const search = (window.location && window.location.search) || "";
+    if(search.indexOf("invite=") < 0) return;
+    const params = new URLSearchParams(search);
+    const raw = params.get("invite");
+    INVITE_FROM_URL = (typeof raw === "string") ? raw.slice(0, 200) : "";
+    params.delete("invite");
+    const q = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (q ? "?" + q : "") + (window.location.hash || ""));
+  }catch(e){ /* jamais bloquant : au pire le code reste dans l'URL */ }
+})();
+
+/* ======================================================================
    ECRITURE DES DONNEES UTILISATEUR (tgcm-done / tgcm-log / tgcm-races)
    Ce sont les seules donnees irremplacables d'Enzo (seances faites, journal
    de ressenti et de genes, courses). Un echec d'ecriture ne doit JAMAIS
    passer inapercu : bandeau persistant + marquage visuel + toast.
    ====================================================================== */
+/* MEME LISTE que BOOT_DATA_KEYS (bloc d'amorcage) : toute evolution de l'une
+   doit toucher l'autre, sinon une cle de donnees cesserait d'etre reperee au
+   demarrage et un appareil plein d'historique se verrait proposer de
+   rejoindre. */
 const USER_KEYS = ["tgcm-done", "tgcm-log", "tgcm-races"];
 const USER_KEY_LABEL = {
   "tgcm-done": "tes séances cochées",
@@ -914,9 +1329,25 @@ function verifyRow(list, label, detail, cls){
 
 function renderProfileNote(){
   const el = $("verifymode"); if(!el) return;
-  el.textContent = "Profil « " + PROFILE_ID + " ». Tes données s'enregistrent sous des clés préfixées par ton profil. "
-    + "Tant qu'une donnée n'a pas été réécrite, l'app continue de lire ton ancienne copie : rien n'est déplacé d'avance. "
-    + "Tes anciennes clés ne sont jamais modifiées ni supprimées.";
+  /* PROFIL INCONNU : on le DIT, au lieu d'afficher « Profil «  » ». Ce cas
+     n'arrive que si le stockage n'a pas pu etre lu au demarrage, et il
+     s'accompagne deja du bandeau d'historique illisible. */
+  if(!PROFILE_ID){
+    el.textContent = "Profil non identifié sur cet appareil : le stockage n'a pas pu être lu au démarrage. "
+      + "Aucune donnée n'est affichée ni modifiée, par précaution. Ferme complètement l'app et rouvre-la ; "
+      + "si ça persiste, sors de la navigation privée et libère de l'espace.";
+    return;
+  }
+  const qui = PROFILE_NAME ? (PROFILE_NAME + " (« " + PROFILE_ID + " »)") : ("« " + PROFILE_ID + " »");
+  /* Le repli sur les anciennes clés n'est ouvert qu'au profil qui en est
+     propriétaire : le promettre à un profil arrivé par invitation serait
+     faux, et laisserait croire que des données vont réapparaître. */
+  el.textContent = "Profil " + qui + ". Tes données s'enregistrent sous des clés préfixées par ton profil. "
+    + (LEGACY_OWNER
+      ? "Tant qu'une donnée n'a pas été réécrite, l'app continue de lire ton ancienne copie : rien n'est déplacé d'avance. "
+        + "Tes anciennes clés ne sont jamais modifiées ni supprimées."
+      : "Si des données sans profil se trouvent sur cet appareil, elles ne sont pas les tiennes : "
+        + "elles ne sont ni lues, ni modifiées, ni supprimées.");
 }
 
 let done = {};
@@ -2041,6 +2472,21 @@ try{
 
   $("stravacheck").addEventListener("click", async function(){
     stravaMsg("", "");
+    /* DEFAUT CORRIGE (etape 3). « Vérifier » envoyait la cle ENREGISTREE et
+       ignorait le champ. Une cle fraichement saisie mais pas encore
+       enregistree produisait donc « Clé d'appareil refusée (HTTP 401) » :
+       le message accusait une cle qui n'avait jamais quitte l'appareil.
+       On le dit explicitement, et on n'envoie RIEN. */
+    const typed = ($("stravakey").value || "").trim();
+    if(typed){
+      let saved = "";
+      try{ saved = await stravaGetKey(); }catch(e){ saved = ""; }
+      if(typed !== saved){
+        stravaMsg("Cette clé n'est pas encore enregistrée : rien n'a été envoyé au serveur. "
+          + "Tape « Enregistrer », puis « Vérifier ».", "err");
+        return;
+      }
+    }
     stravaProbed = true;
     await stravaRefresh();
   });
@@ -2683,6 +3129,15 @@ $("btnexport").addEventListener("click", async function(){
   else { toast(okMsg||"Export prêt — copie le texte", dur); }
   const nom = missing.length ? "suquet-sauvegarde-INCOMPLETE.json" : "suquet-sauvegarde.json";
   try{ const blob=new Blob([str],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=nom; a.click(); setTimeout(function(){URL.revokeObjectURL(url);},1000); }catch(e){}
+  /* Date du dernier export, pour le rappel de sauvegarde. UNIQUEMENT si
+     l'export est COMPLET : un fichier marque « incomplet » ne protege pas ce
+     qu'il n'a pas su lire, il ne doit donc pas faire taire le rappel.
+     Ces `await` sont volontairement APRES le telechargement : le clic et la
+     production du fichier restent dans le meme tour de boucle. */
+  if(!missing.length){
+    try{ await sset(EXPORT_STAMP_KEY, new Date().toISOString()); }catch(e){}
+    try{ await renderBackupNote(); }catch(e){}
+  }
 });
 $("btnimport").addEventListener("click", async function(){
   const raw=$("iobox").value.trim(); if(!raw){ toast("Colle d'abord un export"); return; }
@@ -2758,11 +3213,294 @@ $("btnimport").addEventListener("click", async function(){
   else toast("Import appliqué mais NON enregistré — stockage plein"+planNote, 7000);
 });
 
+/* ======================================================================
+   RAPPEL DE SAUVEGARDE (chantier 3, etape 3)
+
+   Une ligne de FAIT, pas une alerte. Enzo exporte deja regulierement pour
+   discuter du plan : ce rappel protege une habitude, il n'en impose pas une.
+   D'ou trois choix explicites :
+     - PAS D'AMBRE. L'ambre est reserve aux points de vigilance sante et au
+       bandeau de stockage. Un rappel de sauvegarde n'est pas une urgence.
+     - AUCUNE DUREE AFFICHEE. « il y a 47 jours » est un compte a rebours
+       deguise, et c'est aussi la porte ouverte a l'absurde le jour ou
+       l'horloge de l'appareil part en arriere. On dit « plus d'un mois »,
+       ou rien.
+     - REFERMABLE, pour la session seulement. Fermer n'est pas une decision
+       a enregistrer : si l'export n'a toujours pas eu lieu au prochain
+       lancement, la ligne revient. Sans insister davantage.
+   ====================================================================== */
+const EXPORT_STAMP_KEY = "export-last";     // cle PREFIXEE, comme les autres
+const BACKUP_REMIND_DAYS = 31;
+const BACKUP_CLOCK_SKEW_DAYS = 1;           // tolerance avant de juger une date « future »
+let backupDismissed = false;
+
+/* Age du dernier export, en jours, ou null quand on NE SAIT PAS : date
+   absente, illisible, ou dans le futur au-dela de la tolerance d'horloge.
+   null ne veut pas dire « recent » : il conduit au libelle sans duree. */
+function exportAgeDays(iso){
+  if(typeof iso !== "string" || !iso) return null;
+  const t = Date.parse(iso);
+  if(!isFinite(t)) return null;
+  const d = (Date.now() - t) / 86400000;
+  if(d < -BACKUP_CLOCK_SKEW_DAYS) return null;   // horodatage futur : donnee inexploitable
+  return d < 0 ? 0 : d;
+}
+async function renderBackupNote(){
+  const el = $("backupnote"); if(!el) return;
+  // Profil inconnu : l'app n'affiche deja plus aucune donnee, ce rappel
+  // n'aurait aucun sens. Ferme pour la session : on n'insiste pas.
+  if(!PROFILE_ID || backupDismissed){ el.classList.add("hidden"); return; }
+  /* Lecture BRUTE, et non sget(), pour separer deux choses que sget()
+     confond a juste titre ailleurs :
+       - le stockage n'a pas su lire (state "fail") : on NE SAIT PAS, donc on
+         ne dit rien. Annoncer « aucune sauvegarde » sur un stockage muet
+         serait faux, et le bandeau #savealert dit deja l'essentiel ;
+       - la valeur est la mais abimee : la date est perdue, ce qui equivaut
+         a ne pas en avoir. On affiche alors le libelle « jamais exporte »,
+         qui est exact et sans risque.
+     Passer par sget() marquerait en plus un readFailed sur une cle qui n'est
+     pas une donnee d'Enzo. */
+  let r = {state:"fail", value:""};
+  try{ r = await rawGet(profileKey(EXPORT_STAMP_KEY)); }catch(e){ r = {state:"fail", value:""}; }
+  if(r.state === "fail"){ el.classList.add("hidden"); return; }
+  let stamp = "";
+  if(r.state === "ok"){
+    try{ const v = JSON.parse(r.value); if(typeof v === "string") stamp = v; }catch(e){ stamp = ""; }
+  }
+  const age = exportAgeDays(stamp);
+  if(age !== null && age < BACKUP_REMIND_DAYS){ el.classList.add("hidden"); return; }
+  $("backuptext").textContent = (age === null)
+    ? "Aucune sauvegarde exportée depuis cet appareil."
+    : "Ta dernière sauvegarde exportée date de plus d'un mois.";
+  el.classList.remove("hidden");
+}
+try{
+  $("backupclose").addEventListener("click", function(){
+    backupDismissed = true;
+    $("backupnote").classList.add("hidden");
+  });
+  $("backupgo").addEventListener("click", function(){
+    try{ $("tab-journal").click(); }catch(e){}
+    try{ $("btnexport").click(); }catch(e){}
+  });
+}catch(e){ /* un rappel de sauvegarde ne doit jamais empecher l'app de demarrer */ }
+
+/* ======================================================================
+   PREMIERE CONNEXION (chantier 3, etape 3)
+
+   INVARIANT 4, formule exactement : le reseau n'est requis QU'UNE SEULE
+   FOIS, pour rejoindre. Tous les lancements suivants lisent le profil
+   localement (bootProfile) et demarrent sans appeler le serveur. Rejoindre
+   hors-ligne est impossible, et c'est assume ; s'entrainer hors-ligne reste
+   intact. Aucun `await` reseau n'entre dans startApp() : ni pour le plan
+   (plan.json passe par le service worker), ni pour la semaine, ni pour le
+   journal, ni pour les courses.
+
+   TROIS CAUSES D'ECHEC, TROIS MESSAGES. « code invalide » ne doit JAMAIS
+   servir a dire « le serveur est en panne » : la personne recopierait
+   indefiniment un code qui est bon.
+   ====================================================================== */
+const JOIN_FN = "./.netlify/functions/join";
+const JOIN_TIMEOUT = 12000;
+const JOIN_CODE_RE = /^[0-9abcdefghjkmnpqrstvwxyz]{20,64}$/;   // alphabet des secrets serveur
+const JOIN_BAD_CODE = "Invitation invalide, déjà utilisée ou expirée. Demande un nouveau lien à Enzo.";
+let joinBusy = false;
+
+function joinMsg(text, cls){
+  const el = $("joinmsg"); if(!el) return;
+  el.className = "note plan-msg" + (cls ? " " + cls : "") + (text ? "" : " hidden");
+  el.textContent = text || "";
+}
+/* Normalisation identique a celle du serveur : un code recopie a la main
+   arrive avec des espaces, des tirets ou des majuscules. */
+function joinNormalize(v){
+  return String(v === undefined || v === null ? "" : v).trim().toLowerCase().replace(/[\s -]+/g, "");
+}
+function showJoinScreen(st){
+  const el = $("joinscreen"); if(!el) return;
+  el.classList.remove("hidden");
+  try{ document.body.classList.add("joining"); }catch(e){}
+  if(INVITE_FROM_URL){ try{ $("joincode").value = INVITE_FROM_URL; }catch(e){} }
+  /* Des donnees d'entrainement existent sous les anciennes cles, mais aucun
+     profil n'a pu etre deduit. On ne devine pas a qui elles sont, et on le
+     dit franchement plutot que de laisser rejoindre a l'aveugle. */
+  if(st && st.legacy){
+    const w = $("joinlegacy");
+    if(w){
+      w.textContent = "Des données d'entraînement existent déjà sur cet appareil, sous l'ancien format, "
+        + "mais aucun profil ne leur est rattaché. Elles ne seront ni modifiées ni supprimées — "
+        + "et elles ne seront pas non plus reprises : le profil que tu vas rejoindre démarre vide, "
+        + "et ces données lui resteront invisibles. Si elles sont les tiennes, ne rejoins pas ici : "
+        + "préviens Enzo d'abord.";
+      w.classList.remove("hidden");
+    }
+  }
+  try{ (INVITE_FROM_URL ? $("joinname") : $("joincode")).focus(); }catch(e){}
+}
+function hideJoinScreen(){
+  try{ $("joinscreen").classList.add("hidden"); }catch(e){}
+  try{ document.body.classList.remove("joining"); }catch(e){}
+  // Le code ne reste pas dans un champ du DOM une fois consomme.
+  try{ $("joincode").value = ""; }catch(e){}
+  INVITE_FROM_URL = "";
+}
+/* Appel reseau tolerant a l'echec, delai borne, ne leve jamais.
+   `reason` distingue le DELAI DEPASSE de l'ECHEC RESEAU : les confondre
+   empeche de savoir si le serveur a repondu ou non. */
+async function joinCall(code, name){
+  let ctl = null, timer = null, timedOut = false;
+  try{
+    const opts = {
+      method: "POST", cache: "no-store",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({code: code, name: name})
+    };
+    if(typeof AbortController !== "undefined"){ ctl = new AbortController(); opts.signal = ctl.signal; }
+    const guard = new Promise(function(_, reject){
+      timer = setTimeout(function(){
+        timedOut = true;
+        if(ctl){ try{ ctl.abort(); }catch(e){} }
+        reject(new Error("timeout"));
+      }, JOIN_TIMEOUT);
+    });
+    const work = (async function(){
+      const res = await fetch(JOIN_FN, opts);
+      let body = null;
+      try{ body = await res.json(); }catch(e){ body = null; }
+      return {ok: !!res.ok, status: res.status, reason: "", body: body};
+    })();
+    return await Promise.race([work, guard]);
+  }catch(e){
+    return {ok:false, status:0, reason: timedOut ? "timeout" : "network", body:null};
+  }finally{
+    if(timer) clearTimeout(timer);
+  }
+}
+/* La cle est acceptee : on l'enregistre SOUS LE PROFIL qu'elle porte, puis on
+   pose l'ancre. A partir de la, plus aucun lancement n'aura besoin du reseau. */
+async function joinAccept(id, key, name){
+  PROFILE_ID = id;                    // le prefixe existe enfin : les ecritures redeviennent possibles
+  PROFILE_NAME = name || "";
+  /* UN PROFIL ETABLI PAR INVITATION N'HERITE DE RIEN. Les anciennes cles non
+     prefixees appartiennent a la personne qui utilisait cet appareil avant :
+     ni ses seances, ni son journal, ni ses genes ne doivent apparaitre ici,
+     et la premiere ecriture ne doit surtout pas les recopier sous ce profil.
+     La reponse est posee en memoire ET enregistree, pour que le lancement
+     suivant n'ait pas a la redeviner. */
+  LEGACY_OWNER = false;
+  STRAVA_KEY = key;                   // utilisable des cette session, sans relecture
+  let okKey = false, okOwn = false, okAnchor = false;
+  try{ okKey = await sset("strava-key", key); }catch(e){ okKey = false; }
+  /* ORDRE IMPOSE : la marque d'heritage AVANT l'ancre, et l'ancre seulement
+     si la marque a tenu. Une ancre posee sans marque laisserait, au lancement
+     suivant, un profil identifie dont on ne saurait plus qu'il n'herite de
+     rien -- et l'amorcage le prendrait pour une mise a jour. */
+  try{ okOwn = await rawSet(profileKey(LEGACY_OWN_KEY), JSON.stringify(false)); }catch(e){ okOwn = false; }
+  if(okOwn){ try{ okAnchor = await rawSetAnchor(id); }catch(e){ okAnchor = false; } }
+  if(name){ try{ await sset("profile-name", name); }catch(e){} }
+  try{ renderProfileNote(); }catch(e){}
+
+  if(okKey && okOwn && okAnchor){
+    hideJoinScreen();
+    await startApp();
+    setTimeout(function(){ try{ toast("Bienvenue " + (name || id) + " ✓", 4000); }catch(e){} }, 700);
+    return;
+  }
+  /* ECRITURE IMPOSSIBLE (stockage plein, navigation privee). L'invitation est
+     CONSOMMEE et la cle ne se retrouve pas : la cacher condamnerait la
+     personne a redemander une invitation. On la montre UNE FOIS, ici, sur son
+     propre ecran, et on laisse le choix de continuer sans enregistrer. */
+  joinMsg("Ton compte est créé, mais cet appareil n'a pas pu enregistrer la clé "
+    + "(stockage plein, ou navigation privée). Note-la maintenant, elle ne sera plus affichée :\n\n"
+    + key + "\n\n"
+    + "Libère de l'espace, sors de la navigation privée, puis saisis-la dans l'onglet Zones. "
+    + "Tu peux continuer dès maintenant, mais rien ne sera conservé à la fermeture de l'app.", "err");
+  try{ $("joinforce").classList.remove("hidden"); }catch(e){}
+}
+async function joinSubmit(){
+  if(joinBusy) return;                        // verrou : jamais deux remises du meme code en vol
+  const code = joinNormalize($("joincode").value);
+  const name = String($("joinname").value || "").replace(/\s+/g, " ").trim();
+  if(!code){ joinMsg("Saisis ton code d'invitation, ou ouvre le lien qu'Enzo t'a envoyé.", "err"); return; }
+  if(!name){ joinMsg("Indique le prénom à afficher dans l'app.", "err"); return; }
+  if(Array.from(name).length > 40){ joinMsg("Ce prénom est trop long : 40 caractères au maximum.", "err"); return; }
+  if(/[<>]/.test(name) || /[\u0000-\u001f\u007f\u0080-\u009f]/.test(name)){
+    joinMsg("Ce prénom contient des caractères qui ne sont pas acceptés. Essaie une forme plus simple.", "err");
+    return;
+  }
+  // Forme du code verifiee ici pour ne pas envoyer une requete vouee a
+  // l'echec. Le serveur refait exactement la meme verification.
+  if(!JOIN_CODE_RE.test(code)){ joinMsg(JOIN_BAD_CODE, "err"); return; }
+
+  joinBusy = true;
+  try{ $("joingo").disabled = true; }catch(e){}
+  joinMsg("Vérification de l'invitation…", "");
+  let r;
+  try{ r = await joinCall(code, name); }
+  catch(e){ r = {ok:false, status:0, reason:"network", body:null}; }
+  joinBusy = false;
+  try{ $("joingo").disabled = false; }catch(e){}
+
+  // ---- TROIS CAUSES, TROIS MESSAGES ----
+  if(r.reason === "network"){
+    joinMsg("Serveur injoignable. Tu es hors-ligne, ou le site est inaccessible — ce n'est pas ton code. "
+      + "Rejoindre demande une connexion, une seule fois : réessaie une fois connecté.", "err");
+    return;
+  }
+  if(r.reason === "timeout"){
+    joinMsg("Le serveur n'a pas répondu en " + (JOIN_TIMEOUT / 1000) + " s. Ce n'est pas ton code : réessaie dans un instant.", "err");
+    return;
+  }
+  if(r.status === 403){ joinMsg(JOIN_BAD_CODE, "err"); return; }
+  if(r.status === 400){
+    joinMsg("Ce prénom n'est pas accepté par le serveur. Essaie une forme plus simple, sans caractère spécial.", "err");
+    return;
+  }
+  if(!r.ok){
+    const berr = (isPlainObject(r.body) && typeof r.body.error === "string") ? r.body.error : "";
+    joinMsg("Le serveur n'a pas pu traiter la demande (HTTP " + (r.status || 0) + (berr ? " · " + berr : "")
+      + "). Ce n'est pas ton code : réessaie plus tard, ou signale ce code à Enzo.", "err");
+    return;
+  }
+
+  const b = isPlainObject(r.body) ? r.body : null;
+  const key = (b && typeof b.key === "string") ? b.key : "";
+  const prof = (b && isPlainObject(b.profile)) ? b.profile : null;
+  const id = (prof && typeof prof.id === "string") ? prof.id : "";
+  /* La cle doit porter le profil qu'elle pretend ouvrir : c'est ce qui rend
+     impossible d'enregistrer des donnees sous un prefixe qui ne correspond
+     pas a la cle envoyee au serveur. */
+  if(!key || !validProfileId(id) || key.indexOf(id + ".") !== 0){
+    joinMsg("Réponse inattendue du serveur — rien n'a été enregistré sur cet appareil. Signale-le à Enzo.", "err");
+    return;
+  }
+  const name2 = (prof && typeof prof.name === "string") ? prof.name : name;
+  await joinAccept(id, key, name2);
+}
+try{
+  $("joingo").addEventListener("click", function(){ joinSubmit(); });
+  $("joinname").addEventListener("keydown", function(e){ if(e && e.key === "Enter") joinSubmit(); });
+  $("joincode").addEventListener("keydown", function(e){ if(e && e.key === "Enter") joinSubmit(); });
+  $("joinforce").addEventListener("click", async function(){
+    // Poursuite en session seulement : rien n'a pu etre enregistre, et l'app
+    // le dira a chaque ecriture (bandeau #savealert).
+    hideJoinScreen();
+    await startApp();
+  });
+}catch(e){ /* l'ecran de premiere connexion ne doit jamais casser le demarrage */ }
+
 let toastT;
 /* ms optionnel : les appels existants gardent exactement 1800 ms. */
 function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"), ms||1800); }
 
-(async function init(){
+/* Demarrage de l'app A PROFIL CONNU. Rien ici n'appelle le serveur : le plan
+   vient de plan.json (service worker), les donnees du stockage local. C'est
+   ce qui fait que, une fois l'appareil rattache, tous les lancements
+   suivants fonctionnent hors-ligne. */
+let appStarted = false;
+async function startApp(){
+  if(appStarted) return;                 // jamais deux demarrages (rejoindre puis relancer)
+  appStarted = true;
   try{
     $("prevwk").addEventListener("click", ()=>{ if(curWk>0){curWk--; renderWeek();} });
     $("nextwk").addEventListener("click", ()=>{ if(curWk<WEEKS.length-1){curWk++; renderWeek();} });
@@ -2791,10 +3529,79 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
     // Filet de derniere instance : jamais d'ecran fige sur « Chargement du plan… ».
     try{ failToPlanError((e && e.message) || String(e)); }catch(_){}
   }
+  // Rappel de sauvegarde : lecture LOCALE, apres le chargement des donnees.
+  try{ await renderBackupNote(); }catch(e){}
   // Synchro Strava d'ouverture : HORS du chemin de rendu, jamais awaitee ici,
   // et sans le moindre appel reseau si aucune cle d'appareil n'est enregistree.
   try{ stravaAutoSync(); }catch(e){}
   try{ renderStravaSync(); }catch(e){}
+}
+
+/* ======================================================================
+   AMORCAGE. Premiere chose que fait l'app, avant tout rendu et avant toute
+   lecture de donnee : SAVOIR A QUI EST CET APPAREIL.
+
+   Trois issues, et une seule affiche l'ecran de premiere connexion :
+     ok   -> profil deduit du stockage. C'est le cas d'Enzo : rien ne change,
+             rien ne bouge, aucun ecran, aucun appel reseau.
+     none -> tout a ete lu, il n'y a rien : appareil reellement neuf.
+             C'est le SEUL cas ou l'ecran de premiere connexion s'affiche.
+     fail -> une lecture a echoue, ou plusieurs profils cohabitent. On NE SAIT
+             PAS. Surtout pas d'ecran de premiere connexion : proposer de
+             rejoindre a quelqu'un dont on n'a pas su lire l'historique, c'est
+             lui proposer de passer par-dessus. L'app demarre en lecture
+             seule -- aucune ecriture n'est possible sans prefixe -- et le
+             bandeau « historique illisible » explique la situation.
+   ====================================================================== */
+(async function boot(){
+  let st;
+  try{ st = await bootProfile(); }
+  catch(e){ st = {state:"fail", reason:"exception"}; }
+
+  if(st && st.state === "ok"){
+    PROFILE_ID = st.id;
+    /* AVANT LA MOINDRE LECTURE DE DONNEE : a qui sont les anciennes cles non
+       prefixees ? sget() consulte LEGACY_OWNER a chaque repli, la reponse
+       doit donc etre connue avant le premier sget. */
+    try{ LEGACY_OWNER = await resolveLegacyOwner(st); }catch(e){ LEGACY_OWNER = false; }
+    try{ await persistBootMarks(st, LEGACY_OWNER); }catch(e){}
+    try{ const n = await sget("profile-name", ""); PROFILE_NAME = (typeof n === "string") ? n : ""; }
+    catch(e){ PROFILE_NAME = ""; }
+    try{ delete readFailed["profile-name"]; }catch(e){}
+    try{ renderProfileNote(); }catch(e){}
+    /* Lien d'invitation ouvert sur un appareil DEJA rattache : on ne rejoint
+       pas, on ne change pas de profil en silence. Le code a deja ete retire
+       de l'URL. On le dit, sans interrompre le demarrage. */
+    if(INVITE_FROM_URL){
+      INVITE_FROM_URL = "";
+      setTimeout(function(){
+        try{ toast("Invitation ignorée : cet appareil est déjà rattaché au profil « " + PROFILE_ID + " ».", 6000); }catch(e){}
+      }, 1200);
+    }
+    await startApp();
+    return;
+  }
+
+  if(st && st.state === "none"){
+    try{ renderProfileNote(); }catch(e){}
+    showJoinScreen(st);                 // aucune ecriture, aucun appel reseau tant qu'on n'a pas valide
+    return;
+  }
+
+  // fail : on demarre quand meme, mais sans profil, donc sans ecriture
+  // possible et sans repli sur une ancienne copie (cf. sget).
+  try{ renderProfileNote(); }catch(e){}
+  await startApp();
+  setTimeout(function(){
+    try{
+      const r = (st && st.reason) || "";
+      toast(r === "ambigu"
+        ? "Plusieurs profils sont enregistrés sur cet appareil : aucun n'a été choisi. Contacte Enzo."
+        : r === "incoherent"
+        ? "Le profil enregistré sur cet appareil ne correspond à aucune des données qui s'y trouvent. Rien n'a été lu ni modifié. Contacte Enzo."
+        : "Profil non identifié : le stockage de cet appareil n'a pas pu être lu. Rien n'a été modifié.", 9000);
+    }catch(e){}
+  }, 900);
 })();
 
 /* Retour de auth-callback : purement local (aucun appel reseau), entierement

@@ -47,6 +47,14 @@
        200 { ok:true, profile:{...} }
        404 { error:'not_found' }
 
+     { action:'invite',  id, ttl_days? }        ttl_days : entier 1..30, defaut 7
+       201 { ok:true, code:'<code>', code_shown_once:true,
+             url:'https://<site>/?invite=<code>', expires_at:'<iso>',
+             profile_id:'<id>', profile_exists:<booleen> }
+       Le profil n'a PAS besoin d'exister : l'invitation le creera. S'il
+       existe, elle regenerera sa cle sans toucher a ses donnees. Le code
+       n'est renvoye qu'ici, une seule fois, et n'est stocke que hache.
+
    ERREURS communes
      503 { error:'unavailable' }                ADMIN_KEY absente / trop courte
      401 { error:'unauthorized' }               x-admin-key absente ou fausse
@@ -94,11 +102,19 @@ function cleanName(v) {
 }
 
 /* Materiel de cle neuf pour un profil. Le secret en clair ne quitte cette
-   fonction que par le corps de la reponse, une seule fois. */
-async function freshKey(id) {
-  const secret = C.generateSecret();
-  const material = await C.hashSecret(secret);   // { alg, params, salt, hash }
-  return { key: id + '.' + secret, material: material };
+   fonction que par le corps de la reponse, une seule fois.
+   L'implementation vit dans common.js depuis l'etape 3 : la fonction de
+   remise d'invitation doit produire EXACTEMENT le meme materiel, et deux
+   copies de ce calcul finiraient par diverger. */
+const freshKey = C.freshKey;
+
+/* Duree de vie d'une invitation, en jours. Bornee : une invitation qui ne
+   perime pas est une cle d'acces deguisee. */
+function ttlDays(v) {
+  if (v === undefined || v === null) return C.INVITE_TTL_DAYS_DEFAULT;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > C.INVITE_TTL_DAYS_MAX) return null;
+  return n;
 }
 
 exports.handler = async function (event) {
@@ -130,9 +146,9 @@ exports.handler = async function (event) {
       return C.json(200, { ok: true, profiles: profiles });
     }
 
-    /* Les trois autres actions portent toutes sur UN profil : identifiant
-       valide obligatoire, verifie avant tout acces au stockage. */
-    if (action !== 'create' && action !== 'rotate' && action !== 'set-active') return bad('action');
+    /* Les autres actions portent toutes sur UN profil : identifiant valide
+       obligatoire, verifie avant tout acces au stockage. */
+    if (action !== 'create' && action !== 'rotate' && action !== 'set-active' && action !== 'invite') return bad('action');
 
     const id = (typeof body.id === 'string') ? body.id : '';
     if (!C.isProfileId(id)) return bad('id');
@@ -140,6 +156,41 @@ exports.handler = async function (event) {
     let existing = null;
     try { existing = await C.readProfile(event, id); }
     catch (e) { return C.storeFailure(e); }
+
+    /* ---------------- invite ----------------
+       Fabrique un jeton JETABLE qu'Enzo transmet par SMS. Il ne donne acces
+       a rien : il autorise seulement la fonction publique 'join' a remettre
+       UNE cle pour CE profil. Le profil n'a pas besoin d'exister -- c'est
+       justement la voie de creation --, et s'il existe, l'invitation servira
+       a regenerer sa cle (changement de telephone) sans toucher a ses
+       donnees.
+       Le code ne part QUE dans ce corps de reponse : il n'est ni journalise,
+       ni stocke en clair (seul son condensat SHA-256 nomme le document). */
+    if (action === 'invite') {
+      const days = ttlDays(body.ttl_days);
+      if (days === null) return bad('ttl_days');
+      const code = C.generateInviteCode();
+      const expMs = Date.now() + days * 24 * 60 * 60 * 1000;
+      const doc = { v: 1, profile: id, exp: expMs, created_at: now };
+      try { await C.writeInvite(event, C.inviteHash(code), doc); }
+      catch (e) { return C.storeFailure(e); }
+
+      // Le lien est le chemin principal pour une personne non technique. Si
+      // l'origine du site n'est pas connue du runtime, on rend le code seul
+      // plutot qu'une URL fausse.
+      const origin = C.siteOrigin();
+      console.log('[strava] admin | action : invite | profil :', id,
+        '| profil existant :', existing ? 'oui' : 'non', '| jours :', days);
+      return C.json(201, {
+        ok: true,
+        code: code,
+        code_shown_once: true,
+        url: origin ? (origin + '/?invite=' + code) : '',
+        expires_at: new Date(expMs).toISOString(),
+        profile_id: id,
+        profile_exists: !!existing
+      });
+    }
 
     /* ---------------- create ---------------- */
     if (action === 'create') {
