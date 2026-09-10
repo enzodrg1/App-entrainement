@@ -22,8 +22,25 @@
      prefixe des donnees ; la cle n'est qu'un moyen d'acces. Le jeton Strava
      et tout ce qui est range sous 'strava/<profil>/...' restent strictement
      intacts. C'est le point qu'Enzo doit pouvoir tenir pour acquis.
-   - Aucune action de SUPPRESSION : desactiver, oui ; effacer des donnees,
-     non. Ce serait une perte de donnees utilisateur, hors du perimetre.
+   - LA SUPPRESSION ('delete', chantier 3, etape 5) EST LA SEULE OPERATION
+     IRREVERSIBLE. Elle existe parce qu'effacer les donnees de quelqu'un qui
+     le demande est une obligation legale, pas un confort. Elle est protegee
+     par DEUX garde-fous cumulatifs : profil prealablement DESACTIVE, et
+     identifiant RETAPE dans un champ distinct. Elle ne touche JAMAIS un
+     autre profil, et elle ENUMERE plutot que de deviner.
+     Le garde-fou « desactive » se verifie sur le DOCUMENT de profil. S'il
+     n'y a plus de document, il n'y a plus de profil a desactiver ni de cle
+     qui fonctionne : le nettoyage des residus reste possible, et
+     'confirm_id' reste exige.
+     ELLE POSE UNE PIERRE TOMBALE AVANT DE COMMENCER. C'est ce qui rend la
+     suppression definitive independante de la reussite de la purge : une
+     invitation oubliee ne peut plus ressusciter le profil. Seul 'create'
+     leve cette marque.
+   - LA SUPPRESSION NE COUVRE QUE LE SERVEUR. Les seances cochees, le
+     journal, les genes et les courses vivent dans le localStorage du
+     TELEPHONE : le serveur ne peut pas les atteindre. La personne doit
+     utiliser « Supprimer mes données de cet appareil » dans l'onglet Zones.
+     Procedure complete : docs/suppression-profil.md.
 
    ---------------------------------------------------------------------
    CONTRAT
@@ -33,8 +50,13 @@
 
      { action:'create',  id, name }
        201 { ok:true, key:'<id>.<secret>', key_shown_once:true,
+             tombstone_cleared:<booleen>,
              profile:{ id, name, created_at, rotated_at, active } }
        409 { error:'exists' }          un profil porte deja cet identifiant
+       SEUL endroit qui LEVE la pierre tombale posee par 'delete' : un
+       identifiant supprime redevient utilisable, sur geste explicite.
+       tombstone_cleared:false -> la marque n'a pas pu etre levee, et 'join'
+       refusera encore toute invitation pour cet identifiant.
 
      { action:'list' }
        200 { ok:true, profiles:[ { id, name, created_at, rotated_at, active } ] }
@@ -47,10 +69,45 @@
        200 { ok:true, profile:{...} }
        404 { error:'not_found' }
 
+     { action:'delete',  id, confirm_id }       SUPPRESSION DEFINITIVE
+       Le profil doit avoir ete DESACTIVE au prealable, et 'confirm_id' doit
+       repeter 'id' A L'IDENTIQUE (comparaison stricte : ni trim, ni casse
+       ignoree). Efface le document de profil, le jeton Strava, les nonces
+       OAuth et les invitations qui visent ce profil -- et rien d'autre.
+       Revoque au passage l'autorisation Strava, APRES la purge et avec ce
+       qui reste du budget ; un echec de revocation n'empeche JAMAIS la
+       suppression, il est rapporte.
+       ORDRE DE SUPPRESSION : le document de profil part EN DERNIER, et
+       SEULEMENT si tout le reste est parti. Sinon il est CONSERVE
+       ('kept_profile'), et c'est lui qui rend le rejeu possible.
+       REJEU : l'action sait finir le travail meme si le document a DEJA
+       disparu -- elle sonde les residus avant de conclure « rien a faire ».
+       Pose d'abord une PIERRE TOMBALE ('deleted/<id>'), AVANT toute
+       suppression : elle rend le profil injoignable meme si la purge est
+       interrompue, meme si une invitation echappe a l'enumeration. Sans
+       elle, une seule invitation oubliee recreait un profil ACTIF, avec une
+       cle valide, pour quiconque detenait encore le code.
+       200 { ok:true, complete:true, id, verified, tombstone, deleted:{...},
+             scanned:{...}, remaining:{...}, unreadable_invites,
+             kept_profile, strava:{ attempted, revoked, reason },
+             warnings:[...] }
+       500 { ok:false, error:'incomplete', ... }  suppression PARTIELLE :
+             le detail dit ce qui reste. REJOUE : le rejeu reprend ou l'on
+             en etait, il ne repond pas 404 tant qu'il reste des residus.
+       404 { error:'not_found', tombstone }  ni document, ni residu : il n'y
+             a rien a supprimer sous cet identifiant. La pierre tombale est
+             posee quand meme -- y compris sur un identifiant inconnu.
+       409 { error:'profile_active' }        profil actif : desactiver d'abord
+       409 { error:'profile_unreadable' }    document de profil abime
+       400 { error:'bad_request', field:'confirm_id' }
+
      { action:'invite',  id, ttl_days? }        ttl_days : entier 1..30, defaut 7
        201 { ok:true, code:'<code>', code_shown_once:true,
              url:'https://<site>/?invite=<code>', expires_at:'<iso>',
-             profile_id:'<id>', profile_exists:<booleen> }
+             profile_id:'<id>', profile_exists:<booleen>,
+             profile_deleted:<booleen> }
+       profile_deleted:true -> l'identifiant a ete SUPPRIME : 'join' refusera
+       ce code tant qu'un 'create' n'aura pas leve la marque.
        Le profil n'a PAS besoin d'exister : l'invitation le creera. S'il
        existe, elle regenerera sa cle sans toucher a ses donnees. Le code
        n'est renvoye qu'ici, une seule fois, et n'est stocke que hache.
@@ -70,6 +127,22 @@
 const C = require('./lib/common.js');
 
 const ALLOWED = ['POST'];
+/* Budget de temps consacre a la revocation Strava pendant une suppression
+   (rafraichissement eventuel + appel de revocation).
+
+   DEUX PROTECTIONS, parce qu'une seule ne suffisait pas. Le budget etait
+   borne, mais la revocation passait AVANT la purge : un Strava qui PEND
+   consommait plus de cinq secondes sur une invocation d'environ dix, et la
+   purge d'un profil charge pouvait etre coupee en plein milieu -- exactement
+   le « echouer a cause de Strava » que ce budget est cense empecher.
+   Desormais : la PURGE D'ABORD (l'obligation legale), la revocation ENSUITE
+   (le bonus), avec ce qui reste du budget total et jamais plus. Le jeton est
+   lu AVANT la purge, puisque la purge l'efface ; sa valeur ne sert qu'a la
+   revocation et ne quitte pas cette fonction. */
+const DELETE_STRAVA_BUDGET_MS = 3000;
+/* Enveloppe de l'action complete, sous l'echeance d'invocation (~10 s) :
+   au-dela, on ne tente plus le reseau du tout. */
+const DELETE_TOTAL_BUDGET_MS = 9000;
 const NAME_MAX = 60;
 const BODY_MAX = 4096;
 
@@ -148,10 +221,176 @@ exports.handler = async function (event) {
 
     /* Les autres actions portent toutes sur UN profil : identifiant valide
        obligatoire, verifie avant tout acces au stockage. */
-    if (action !== 'create' && action !== 'rotate' && action !== 'set-active' && action !== 'invite') return bad('action');
+    if (action !== 'create' && action !== 'rotate' && action !== 'set-active'
+      && action !== 'invite' && action !== 'delete') return bad('action');
 
     const id = (typeof body.id === 'string') ? body.id : '';
     if (!C.isProfileId(id)) return bad('id');
+
+    /* ---------------- delete ----------------
+       LA SEULE OPERATION IRREVERSIBLE DU SYSTEME. Elle efface les donnees de
+       sante d'une personne : c'est une obligation legale, et il n'existe
+       aucune corbeille.
+
+       DEUX GARDE-FOUS, non negociables et verifies DANS CET ORDRE :
+         1. L'identifiant doit etre RETAPE dans un champ distinct
+            ('confirm_id'). Comparaison STRICTE : ni trim, ni casse ignoree.
+            Une faute de frappe ne doit pas detruire le mauvais profil, et
+            un identifiant recopie avec un espace n'est pas le meme.
+            Verifie AVANT tout acces au stockage.
+         2. Le profil doit avoir ete DESACTIVE au prealable (set-active
+            false). Un profil actif ne se supprime pas d'un seul geste : la
+            desactivation est le temps de reflexion, et elle ferme deja
+            l'acces (checkKey refuse un profil desactive).
+
+       Un document de profil ABIME ('invalid') n'est PAS supprimable ici :
+       on ne peut pas verifier qu'il etait desactive, et l'effacer
+       reviendrait a supprimer sur la foi d'un document qu'on n'a pas su
+       lire. Chemin de reparation : docs/suppression-profil.md.
+
+       REVOCATION STRAVA AU MIEUX, JAMAIS BLOQUANTE : une panne de Strava ne
+       doit pas empecher une suppression legale. Le compte rendu dit
+       exactement s'il reste une autorisation a retirer a la main. */
+    if (action === 'delete') {
+      const confirm = (typeof body.confirm_id === 'string') ? body.confirm_id : '';
+      if (confirm !== id) return bad('confirm_id');
+      const started = Date.now();
+
+      /* readProfileState, et non readProfile : « absent » et « present mais
+         illisible » ne se traitent pas pareil quand on s'apprete a effacer. */
+      let found;
+      try { found = await C.readProfileState(event, id); }
+      catch (e) { return C.storeFailure(e); }
+      if (found.state === 'invalid') return C.json(409, { error: 'profile_unreadable' });
+      if (found.state === 'ok' && found.doc.active !== false) return C.json(409, { error: 'profile_active' });
+
+      /* PIERRE TOMBALE D'ABORD, ET AVANT TOUTE SUPPRESSION.
+         C'est la seule barriere qui empeche une invitation oubliee de
+         RESSUSCITER ce profil, et elle ne vaut que si elle est posee AVANT :
+         une purge interrompue doit laisser un profil injoignable, pas un
+         profil a moitie efface et rejoignable. Elle est posee meme quand il
+         n'y a apparemment rien a supprimer -- c'est justement le cas ou une
+         enumeration eventuellement coherente peut nous cacher une invitation
+         qui apparaitra une seconde plus tard.
+         CONSEQUENCE ASSUMEE : un 'delete' sur un identifiant inconnu marque
+         cet identifiant. Il redevient utilisable par un 'create' explicite.
+         Fail-closed : mieux vaut un identifiant a rouvrir a la main qu'un
+         profil supprime qui revient a la vie. */
+      const tombstone = await C.markProfileDeleted(event, id, now);
+
+      /* DOCUMENT ABSENT : « deja supprime » N'EST PAS LA SEULE EXPLICATION.
+         Une suppression partielle anterieure a pu emporter le document et
+         laisser derriere elle un jeton, des nonces ou -- le pire -- une
+         INVITATION qui vise encore ce profil : remise a 'join', elle recree
+         un profil ACTIF avec une cle valide. Repondre 404 sans regarder
+         rendait ces objets inatteignables pour toujours.
+         On SONDE donc, en lecture seule. Rien derriere : 404, comme avant.
+         Quelque chose derriere (ou une sonde qui n'a pas abouti) : on
+         continue, la purge finit le travail. Le garde-fou « profil
+         desactive » n'est pas contourne pour autant -- sans document, il n'y
+         a plus de profil a activer, la cle d'acces ne fonctionne plus
+         (checkKey lit le document), et 'confirm_id' reste exige. */
+      if (found.state === 'absent') {
+        let residue;
+        try { residue = await C.probeProfileResidue(event, id); }
+        catch (e) { return C.storeFailure(e); }
+        /* 'unreadable' N'EST PAS UN RESIDU DE CE PROFIL : c'est un compte
+           GLOBAL de documents d'invitation abimes, dont on ignore justement
+           qui ils visent. L'y compter faisait repondre « il reste quelque
+           chose » pour tous les profils a la fois, y compris ceux qui n'ont
+           jamais existe. */
+        const leftovers = !!(residue.token || residue.nonces || residue.invites
+          || !residue.checked);
+        if (!leftovers) return C.json(404, { error: 'not_found', tombstone: tombstone });
+      }
+
+      /* Le jeton est lu MAINTENANT : la purge va l'effacer, et la revocation
+         a besoin de sa valeur. Aucune valeur de jeton ne sort d'ici. */
+      let token = null, tokenRead = true;
+      try { token = await C.readToken(event, id); }
+      catch (e) { tokenRead = false; }
+
+      /* LA PURGE D'ABORD. C'est l'obligation legale ; la revocation Strava
+         est un bonus qui ne doit jamais lui manger son temps. */
+      let purge;
+      try { purge = await C.purgeProfileData(event, id); }
+      catch (e) { return C.storeFailure(e); }   // rien n'a pu etre tente
+
+      /* REVOCATION ENSUITE, AU MIEUX, avec ce qui reste du budget. Si la
+         purge a tout consomme, on ne touche pas au reseau et on le DIT :
+         'no_time' n'est pas 'no_token'. */
+      let strava = { attempted: false, revoked: false, reason: 'no_token' };
+      if (!tokenRead) strava = { attempted: false, revoked: false, reason: 'token_unreadable' };
+      else if (token) {
+        const left = Math.min(DELETE_STRAVA_BUDGET_MS,
+          (started + DELETE_TOTAL_BUDGET_MS) - Date.now());
+        if (!(left > 0)) strava = { attempted: false, revoked: false, reason: 'no_time' };
+        else {
+          try { strava = await C.revokeStravaToken(token, Date.now() + left); }
+          catch (e) { strava = { attempted: true, revoked: false, reason: 'error' }; }
+        }
+      }
+
+      const rem = purge.remaining;
+      /* COMPLET = mesure, pas deduction : le controle par relecture a abouti,
+         il ne reste rien pour CE profil, aucune suppression unitaire n'a
+         echoue, et la pierre tombale est bien posee.
+         LES INVITATIONS ILLISIBLES NE COMPTENT PAS. Elles n'appartiennent a
+         aucun profil identifiable : les imputer a celui-ci rendait le 404 --
+         le seul controle de fin recommande -- litteralement inatteignable,
+         pour ce profil comme pour tous les autres, et cela pour toujours.
+         Elles restent un avertissement, global, plus bas.
+         LA PIERRE TOMBALE, ELLE, COMPTE : sans elle, un code residuel peut
+         encore ressusciter le profil, et ce n'est pas une suppression. */
+      const complete = !!(rem.checked && tombstone
+        && !rem.profile && !rem.token && rem.nonces === 0 && rem.invites === 0
+        && !purge.failed.profile && !purge.failed.token
+        && !purge.failed.nonces && !purge.failed.invites);
+
+      /* Ce qui merite un coup d'oeil d'Enzo, en clair. Codes courts, aucune
+         valeur secrete, aucun chemin de stockage. */
+      const warnings = [];
+      if (!tombstone) warnings.push('pierre_tombale_absente');
+      if (!strava.revoked) warnings.push('strava_non_revoque:' + strava.reason);
+      /* GLOBAL, et le suffixe le dit : ces documents ne sont pas un residu de
+         ce profil-ci, ils sont dans le magasin, tous profils confondus. */
+      if (purge.unreadable_invites) warnings.push('invitations_illisibles_globales:' + purge.unreadable_invites);
+      if (purge.truncated) warnings.push('enumeration_tronquee');
+      if (!rem.checked) warnings.push('verification_impossible');
+
+      console.log('[strava] admin | action : delete | profil :', id,
+        '| complet :', complete ? 'oui' : 'non',
+        '| pierre tombale :', tombstone ? 'posee' : 'ABSENTE',
+        '| strava revoque :', strava.revoked ? 'oui' : 'non',
+        '| motif strava :', strava.reason);
+
+      const payload = {
+        id: id,
+        complete: complete,
+        verified: !!rem.checked,
+        /* true = le profil est desormais INJOIGNABLE, quoi qu'il reste :
+           aucun code d'invitation residuel ne peut le recreer. */
+        tombstone: tombstone,
+        deleted: purge.deleted,
+        scanned: purge.scanned,
+        remaining: {
+          profile: rem.profile, token: rem.token,
+          nonces: rem.nonces, invites: rem.invites
+        },
+        unreadable_invites: purge.unreadable_invites,
+        /* true = le document de profil a ete GARDE volontairement, parce
+           qu'il reste des objets a viser. C'est lui qui rend le rejeu
+           possible : ne le supprime pas a la main. */
+        kept_profile: !!purge.kept_profile,
+        strava: { attempted: strava.attempted, revoked: strava.revoked, reason: strava.reason },
+        warnings: warnings
+      };
+      /* PAS DE SUCCES SILENCIEUX PARTIEL : une suppression incomplete sort en
+         500 avec le detail de ce qui reste, pour qu'un script qui ne lit que
+         le code HTTP ne la prenne pas pour un succes. */
+      if (!complete) return C.json(500, Object.assign({ ok: false, error: 'incomplete' }, payload));
+      return C.json(200, Object.assign({ ok: true }, payload));
+    }
 
     let existing = null;
     try { existing = await C.readProfile(event, id); }
@@ -175,12 +414,26 @@ exports.handler = async function (event) {
       try { await C.writeInvite(event, C.inviteHash(code), doc); }
       catch (e) { return C.storeFailure(e); }
 
+      /* PROFIL SUPPRIME : l'invitation est ecrite, mais 'join' la refusera --
+         la pierre tombale prime, et c'est ce qui empeche un profil supprime
+         de revenir a la vie. Emettre un code qui ne peut pas fonctionner sans
+         le dire serait un piege : on le SIGNALE, sans rien decider a la place
+         d'Enzo (il lui suffit d'un 'create' pour rouvrir l'identifiant).
+         Une lecture en echec est signalee comme un profil supprime :
+         fail-closed, on ne promet pas ce qu'on n'a pas verifie. */
+      let deletedMark = true;
+      try {
+        const t = await C.readProfileTombstone(event, id);
+        deletedMark = (t.state !== 'none');
+      } catch (e) { deletedMark = true; }
+
       // Le lien est le chemin principal pour une personne non technique. Si
       // l'origine du site n'est pas connue du runtime, on rend le code seul
       // plutot qu'une URL fausse.
       const origin = C.siteOrigin();
       console.log('[strava] admin | action : invite | profil :', id,
-        '| profil existant :', existing ? 'oui' : 'non', '| jours :', days);
+        '| profil existant :', existing ? 'oui' : 'non',
+        '| profil supprime :', deletedMark ? 'oui' : 'non', '| jours :', days);
       return C.json(201, {
         ok: true,
         code: code,
@@ -188,7 +441,10 @@ exports.handler = async function (event) {
         url: origin ? (origin + '/?invite=' + code) : '',
         expires_at: new Date(expMs).toISOString(),
         profile_id: id,
-        profile_exists: !!existing
+        profile_exists: !!existing,
+        /* true = cet identifiant a ete supprime : 'join' refusera ce code
+           tant qu'un 'create' explicite n'aura pas leve la marque. */
+        profile_deleted: deletedMark
       });
     }
 
@@ -214,8 +470,26 @@ exports.handler = async function (event) {
       try { await C.writeProfile(event, doc); }
       catch (e) { return C.storeFailure(e); }
 
-      console.log('[strava] admin | action : create | profil :', id, '| actif : oui');
-      return C.json(201, { ok: true, key: fresh.key, key_shown_once: true, profile: C.publicProfile(doc) });
+      /* LEVEE DE LA PIERRE TOMBALE, et c'est le SEUL endroit ou elle a lieu.
+         Un identifiant supprime doit pouvoir resservir, mais seulement sur un
+         geste explicite d'Enzo, authentifie par ADMIN_KEY.
+         APRES l'ecriture du document, jamais avant : la lever d'abord et
+         echouer ensuite rouvrirait la porte aux codes residuels sans qu'aucun
+         profil n'existe pour les recevoir.
+         Si la levee echoue, on le DIT : 'join' continuerait de refuser toutes
+         les invitations de ce profil, et rien dans la reponse ne l'aurait
+         laisse deviner. */
+      let cleared = false;
+      try { cleared = await C.clearProfileTombstone(event, id); }
+      catch (e) { cleared = false; }
+
+      console.log('[strava] admin | action : create | profil :', id, '| actif : oui',
+        '| pierre tombale levee :', cleared ? 'oui' : 'non');
+      return C.json(201, {
+        ok: true, key: fresh.key, key_shown_once: true,
+        tombstone_cleared: cleared,
+        profile: C.publicProfile(doc)
+      });
     }
 
     if (!existing) return C.json(404, { error: 'not_found' });

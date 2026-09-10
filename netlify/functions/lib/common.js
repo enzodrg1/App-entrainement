@@ -478,6 +478,90 @@ async function claimInvite(event, hash, doc, nowIso) {
   return !!(back && back.claim === claim);
 }
 
+/* ---------- PIERRE TOMBALE DE PROFIL (chantier 3, etape 5) ----------------
+   LE PROBLEME QU'ELLE RESOUT, ET AUCUN AUTRE. Une invitation qui survit a la
+   suppression RESSUSCITE le profil : 'join' recree un document actif, avec
+   une cle valide, pour quiconque detient encore le code. La defense « tant
+   qu'il reste quelque chose, le document de profil est conserve » ne suffit
+   pas, et deux pannes tres ordinaires le montrent :
+     A. L'ENUMERATION EST EVENTUELLEMENT COHERENTE. st.list() peut ne pas
+        encore voir une invitation recente. La purge ne la supprime pas, et
+        le controle par relecture -- qui utilise LE MEME list() -- ne la voit
+        pas davantage : la suppression s'annonce complete, en toute bonne foi.
+        (Rien ne repare cela cote enumeration : @netlify/blobs 8.2 n'accepte
+        aucune option de coherence sur list(), seulement sur le magasin, et
+        la coherence forte n'est de toute facon promise que sur get().)
+     B. LE DOCUMENT DE PROFIL A DEJA DISPARU -- etat que cette base peut deja
+        contenir -- et une suppression echoue : il ne reste plus rien a
+        « conserver » pour bloquer quoi que ce soit.
+   Dans les deux cas, un profil desactive puis supprime revient a la vie.
+
+   CE QUE C'EST. Un document minuscule range sous 'deleted/<id>', qui ne
+   contient AUCUNE donnee : un identifiant de profil et une date. 'join' le
+   consulte a chaque remise et refuse tout code visant un profil marque.
+
+   ECRITE AVANT TOUTE SUPPRESSION, jamais apres : c'est tout son interet. Une
+   purge interrompue au milieu laisse alors un profil INJOIGNABLE, pas un
+   profil a moitie efface et rejoignable. L'ordre inverse aurait exactement
+   le defaut qu'on cherche a corriger.
+
+   LEVEE UNIQUEMENT PAR 'create', authentifiee par ADMIN_KEY : Enzo doit
+   pouvoir reutiliser un identifiant plus tard, et c'est un geste explicite.
+   ------------------------------------------------------------------------ */
+const TOMBSTONE_PREFIX = 'deleted/';
+function tombstoneKey(profileId) { return TOMBSTONE_PREFIX + assertProfileId(profileId); }
+/* Forme EXACTE : { v:1, profile:'<id>', deleted_at:'<iso>' }. Aucun secret,
+   aucune donnee d'utilisateur : ce document est une absence, pas un contenu. */
+function validTombstoneDoc(o) {
+  return !!(o && typeof o === 'object' && o.v === 1 && isProfileId(o.profile));
+}
+/* {state:'none'|'deleted'|'invalid'}. Un document present mais ILLISIBLE vaut
+   'invalid', et 'join' le traite comme 'deleted' : on ne ressuscite pas un
+   profil sur la foi d'un document qu'on n'a pas su lire. Un JSON carrement
+   invalide fait lever st.get -> StoreError -> l'appelant repond 503, ce qui
+   est fail-closed aussi. */
+async function readProfileTombstone(event, profileId) {
+  const k = tombstoneKey(profileId);
+  const doc = await withStore(event, function (st) { return st.get(k, { type: 'json' }); });
+  if (doc === null || doc === undefined) return { state: 'none', doc: null };
+  if (!validTombstoneDoc(doc) || doc.profile !== profileId) return { state: 'invalid', doc: null };
+  return { state: 'deleted', doc: doc };
+}
+/* Pose la marque, avec UNE reprise, puis CONTROLE PAR RELECTURE. On ne
+   suppose jamais qu'elle est en place : c'est la seule barriere qui empeche
+   un code residuel de ressusciter le profil, et l'appelant doit pouvoir dire
+   la verite a Enzo quand elle manque. Ne leve jamais. */
+async function markProfileDeleted(event, profileId, nowIso) {
+  let k, doc;
+  try {
+    k = tombstoneKey(profileId);
+    doc = { v: 1, profile: profileId, deleted_at: nowIso || new Date().toISOString() };
+  } catch (e) { return false; }
+  try {
+    await withStore(event, function (st) { return st.setJSON(k, doc); });
+  } catch (e1) {
+    try { await withStore(event, function (st) { return st.setJSON(k, doc); }); }
+    catch (e2) { return false; }
+  }
+  try {
+    const back = await withStore(event, function (st) { return st.get(k, { type: 'json' }); });
+    return !!(validTombstoneDoc(back) && back.profile === profileId);
+  } catch (e) { return false; }
+}
+/* Leve la marque. Rendu true seulement si la RELECTURE confirme l'absence :
+   sinon 'create' annoncerait un identifiant reutilisable alors que 'join'
+   continuerait de le refuser. Ne leve jamais. */
+async function clearProfileTombstone(event, profileId) {
+  let k;
+  try { k = tombstoneKey(profileId); } catch (e) { return false; }
+  try { await withStore(event, function (st) { return st.delete(k); }); }
+  catch (e) { return false; }
+  try {
+    const back = await withStore(event, function (st) { return st.get(k, { type: 'json' }); });
+    return (back === null || back === undefined);
+  } catch (e) { return false; }
+}
+
 function headerValue(event, name) {
   const h = (event && event.headers) || {};
   const lower = name.toLowerCase();
@@ -905,6 +989,262 @@ async function takeNonce(event, profileId, nonce) {
   });
 }
 
+/* ---------- SUPPRESSION COMPLETE D'UN PROFIL (chantier 3, etape 5) ----------
+   C'est la SEULE operation irreversible du systeme, et la seule obligation
+   legale du projet : une donnee de sante qui survit a une demande
+   d'effacement est un manquement, pas un detail.
+
+   ON ENUMERE, ON NE DEVINE PAS. Les objets qui appartiennent a un profil ne
+   se nomment pas tous de la meme facon :
+     - 'profiles/<id>'            : nommable directement.
+     - 'strava/<id>/token'        : nommable directement.
+     - 'oauth-nonce/<id>/<nonce>' : le nonce est aleatoire -> ENUMERATION sous
+       le prefixe du profil, et re-verification de chaque cle contre ce
+       prefixe avant tout acces (meme regle que sweepExpiredNonces).
+     - 'invites/<sha256(code)>'   : la cle ne porte PAS le profil vise, il est
+       DANS le document -> enumeration de TOUTES les invitations, lecture, et
+       suppression des seules qui visent CE profil. Une invitation illisible
+       n'est PAS supprimee (on ignore qui elle vise : la supprimer pourrait
+       depasser le profil vise) mais elle est COMPTEE et signalee.
+
+   ORDRE, ET IL N'EST PAS COSMETIQUE : le document de profil part EN
+   DERNIER, ET SEULEMENT SI TOUT LE RESTE EST REELLEMENT PARTI. Ce document
+   est ce qui permet a l'action 'delete' de retrouver le profil et de
+   verifier ses garde-fous ; l'effacer alors qu'il reste des objets
+   laisserait des donnees derriere. Surtout, une INVITATION orpheline qui
+   survit RESSUSCITE le profil : 'join' recree un document actif, avec une
+   cle valide, pour quiconque detient le code -- un profil qu'Enzo avait
+   desactive puis supprime reviendrait a la vie. Tant qu'il reste quoi que
+   ce soit, ou que l'enumeration a echoue ou a ete tronquee, le document est
+   CONSERVE ('kept_profile') et l'operation se rejoue. L'acces, lui, est
+   deja ferme : 'delete' exige que le profil ait ete desactive au prealable,
+   et un document conserve reste desactive.
+
+   ET SI LE DOCUMENT A DEJA DISPARU ? Cet etat existe peut-etre deja sur le
+   site (une suppression partielle anterieure l'effacait sans condition).
+   Cette fonction sait le finir : elle ne depend d'aucun document de profil
+   pour nommer le jeton, les nonces et les invitations. Elle n'annonce alors
+   ni 'deleted.profile' ni 'kept_profile' -- il n'y avait rien a supprimer,
+   et rien a garder. C'est a 'delete' de la rappeler dans ce cas, via
+   probeProfileResidue().
+
+   CONTROLE PAR RELECTURE. La fonction ne DEDUIT pas ce qui reste, elle le
+   RELIT -- avant de decider du sort du document de profil, et apres l'avoir
+   supprime. 'remaining.checked' vaut false si ce controle n'a pas pu etre
+   fait : dans ce cas on ne conclut jamais a une suppression complete, et le
+   document est conserve.
+
+   Ne leve que si le magasin ne peut pas etre INITIALISE (rien n'a alors ete
+   tente). Tout echec unitaire est compte, jamais avale. */
+const PURGE_SCAN_MAX = 2000;            // borne de securite sur une enumeration
+
+/* CE QUI RESTE, RELU DANS LE MAGASIN. Une seule implementation, employee a
+   TROIS endroits : le controle intermediaire (avant de decider du sort du
+   document de profil), le controle final, et la SONDE DE RESIDUS dont
+   'delete' se sert pour distinguer « profil deja supprime, rien derriere »
+   de « document deja parti, mais residus encore la ».
+   Ne leve jamais : 'checked' tombe a false des qu'une lecture a echoue.
+
+   INVITATIONS ILLISIBLES : comptees a part ('unreadable'), jamais dans
+   'invites'. Un document d'invitation invalide ne peut ressusciter aucun
+   profil -- 'join' le refuse (readInvite -> validInviteDoc) -- et il ne dit
+   pas quel profil il vise : le compter comme un reste ferait dependre la
+   suppression d'un profil du document abime d'un AUTRE, et pour toujours.
+
+   'unreadable' EST UN COMPTE GLOBAL, PAS UN RESTE DE CE PROFIL-CI. Il vaut
+   la meme chose pour tous les identifiants qu'on lui passe : c'est le nombre
+   de documents d'invitation abimes presents dans le magasin, sans que l'on
+   sache qui ils visent. L'imputer au profil examine avait trois effets, tous
+   faux : un profil pourtant entierement purge repondait 500 a l'infini, le
+   controle documente (« rejoue jusqu'a obtenir 404 ») ne pouvait jamais
+   aboutir, et une seule invitation abimee contaminait le verdict de TOUS les
+   profils, y compris ceux qui n'ont jamais existe. Les appelants doivent
+   donc le rapporter comme un AVERTISSEMENT GLOBAL, jamais comme un residu. */
+async function countRemaining(st, id) {
+  const out = { profile: true, token: true, nonces: 0, invites: 0, unreadable: 0, checked: true };
+  const pKey = PROFILE_PREFIX + id;
+  const tKey = tokenKey(id);
+  const nPrefix = NONCE_PREFIX + id + '/';
+  try {
+    const p = await st.get(pKey, { type: 'json' });
+    out.profile = !(p === null || p === undefined);
+  } catch (e) { out.checked = false; }
+  try {
+    const t = await st.get(tKey, { type: 'json' });
+    out.token = !(t === null || t === undefined);
+  } catch (e) { out.checked = false; }
+  try {
+    const listed = await st.list({ prefix: nPrefix });
+    const blobs = (listed && Array.isArray(listed.blobs)) ? listed.blobs : [];
+    let n = 0;
+    for (let i = 0; i < blobs.length; i++) {
+      const key = String((blobs[i] && blobs[i].key) || '');
+      /* MEME FILTRE QU'A LA SUPPRESSION, et c'est tout l'interet : le
+         prefixe du profil, rien de plus. Une cle parasite rangee sous ce
+         prefixe etait comptee ici et ignoree la-bas : 500 permanent. */
+      if (key.indexOf(nPrefix) === 0) n++;
+    }
+    out.nonces = n;
+  } catch (e) { out.checked = false; }
+  try {
+    const listed = await st.list({ prefix: INVITE_PREFIX });
+    const blobs = (listed && Array.isArray(listed.blobs)) ? listed.blobs : [];
+    let n = 0;
+    for (let i = 0; i < blobs.length; i++) {
+      const key = String((blobs[i] && blobs[i].key) || '');
+      if (key.indexOf(INVITE_PREFIX) !== 0) continue;
+      /* MEME FILTRE QU'A LA SUPPRESSION, ici aussi. Une invitation se nomme
+         'invites/<sha256 du code>' : c'est ce nom, et lui seul, que 'join'
+         sait calculer. Une cle rangee sous 'invites/' sans cette forme n'est
+         donc atteignable par personne et n'est pas une invitation ; la
+         compter ici sans jamais l'effacer la-bas produisait un 500
+         permanent. */
+      if (!INVITE_HASH_RE.test(key.slice(INVITE_PREFIX.length))) continue;
+      let doc = null;
+      try { doc = await st.get(key, { type: 'json' }); } catch (e) { out.unreadable++; continue; }
+      if (doc === null || doc === undefined) continue;
+      if (!validInviteDoc(doc)) { out.unreadable++; continue; }
+      if (doc.profile === id) n++;
+    }
+    out.invites = n;
+  } catch (e) { out.checked = false; }
+  return out;
+}
+
+/* SONDE DE RESIDUS, en LECTURE SEULE. Ne supprime rien, n'ecrit rien.
+   Repond honnetement a « ce profil n'a plus de document : reste-t-il
+   quelque chose a nettoyer ? ». */
+async function probeProfileResidue(event, profileId) {
+  const id = assertProfileId(profileId);
+  return withStore(event, function (st) { return countRemaining(st, id); });
+}
+
+async function purgeProfileData(event, profileId) {
+  const id = assertProfileId(profileId);          // barriere avant toute cle
+  const pKey = PROFILE_PREFIX + id;
+  const tKey = tokenKey(id);
+  const nPrefix = NONCE_PREFIX + id + '/';
+  const out = {
+    deleted: { profile: false, token: false, nonces: 0, invites: 0 },
+    failed: { profile: false, token: false, nonces: 0, invites: 0 },
+    scanned: { nonces: 0, invites: 0 },
+    unreadable_invites: 0,
+    truncated: false,
+    kept_profile: false,
+    remaining: { profile: true, token: true, nonces: 0, invites: 0, checked: false }
+  };
+
+  await withStore(event, async function (st) {
+    /* 1. JETON STRAVA.
+       'deleted.token' dit QU'UN JETON A ETE SUPPRIME, pas qu'un delete a ete
+       envoye : sur ce magasin, supprimer une cle absente reussit tout aussi
+       bien. Annoncer deleted.token=true pour un profil qui n'a jamais eu de
+       jeton -- un identifiant inconnu, par exemple -- est un mensonge, et
+       c'est justement sur ce compte rendu qu'Enzo s'appuie pour clore un
+       dossier. On regarde donc AVANT. Presence indeterminee (lecture en
+       echec) -> on annonce false : le controle par relecture, lui, dira la
+       verite sur ce qui reste. */
+    let hadToken = null;
+    try {
+      const t0 = await st.get(tKey, { type: 'json' });
+      hadToken = !(t0 === null || t0 === undefined);
+    } catch (e) { hadToken = null; }
+    try { await st.delete(tKey); out.deleted.token = (hadToken === true); }
+    catch (e) { out.failed.token = true; }
+
+    /* 2. NONCES OAUTH : enumeres sous le prefixe du profil. Chaque cle est
+       RE-VERIFIEE contre ce prefixe, meme si le magasin repondait autre
+       chose que ce qu'on lui a demande.
+       TOUT ce qui est range sous 'oauth-nonce/<id>/' appartient a CE profil :
+       c'est le prefixe qui le prouve, pas la forme du nonce. On efface donc
+       aussi les cles parasites de cet espace -- ce sont ses donnees, et une
+       suppression legale ne laisse pas derriere elle ce qu'elle ne sait pas
+       nommer. Le filtre de la relecture est EXACTEMENT le meme : sans cela,
+       une cle parasite restait comptee comme « reste » sans jamais pouvoir
+       etre effacee. */
+    try {
+      const listed = await st.list({ prefix: nPrefix });
+      const blobs = (listed && Array.isArray(listed.blobs)) ? listed.blobs : [];
+      if (blobs.length > PURGE_SCAN_MAX) out.truncated = true;
+      for (let i = 0; i < blobs.length && i < PURGE_SCAN_MAX; i++) {
+        const key = String((blobs[i] && blobs[i].key) || '');
+        if (key.indexOf(nPrefix) !== 0) continue;          // jamais hors du profil
+        out.scanned.nonces++;
+        try { await st.delete(key); out.deleted.nonces++; }
+        catch (e) { out.failed.nonces++; }
+      }
+    } catch (e) { out.failed.nonces++; }
+
+    /* 3. INVITATIONS : la cle est un condensat, elle ne dit rien du profil
+       vise. On lit le document, et on ne supprime QUE 'profile === id'. */
+    try {
+      const listed = await st.list({ prefix: INVITE_PREFIX });
+      const blobs = (listed && Array.isArray(listed.blobs)) ? listed.blobs : [];
+      if (blobs.length > PURGE_SCAN_MAX) out.truncated = true;
+      for (let i = 0; i < blobs.length && i < PURGE_SCAN_MAX; i++) {
+        const key = String((blobs[i] && blobs[i].key) || '');
+        if (key.indexOf(INVITE_PREFIX) !== 0) continue;
+        if (!INVITE_HASH_RE.test(key.slice(INVITE_PREFIX.length))) continue;
+        out.scanned.invites++;
+        let doc = null;
+        try { doc = await st.get(key, { type: 'json' }); }
+        catch (e) { out.unreadable_invites++; continue; }
+        if (doc === null || doc === undefined) continue;   // disparue entre-temps
+        if (!validInviteDoc(doc)) { out.unreadable_invites++; continue; }
+        if (doc.profile !== id) continue;                  // vise un AUTRE profil
+        try { await st.delete(key); out.deleted.invites++; }
+        catch (e) { out.failed.invites++; }
+      }
+    } catch (e) { out.failed.invites++; }
+
+    /* 4. CONTROLE INTERMEDIAIRE, PUIS SORT DU DOCUMENT DE PROFIL.
+       On RELIT avant de decider : le document ne part que si plus rien
+       d'attribuable au profil ne subsiste, que le controle a pu se faire, et
+       qu'aucune suppression unitaire n'a echoue. Sinon il est CONSERVE -- il
+       est desactive, il ne donne acces a rien, et c'est lui qui rend le
+       rejeu possible.
+       Les invitations ILLISIBLES ne bloquent PAS, ici ni ailleurs : elles ne
+       visent peut-etre pas ce profil, elles ne peuvent ressusciter personne
+       (join refuse un document d'invitation invalide), et bloquer sur elles
+       rendrait la suppression impossible pour toujours -- pour ce profil
+       comme pour tous les autres. Elles sortent en 'unreadable_invites',
+       AVERTISSEMENT GLOBAL a l'usage d'Enzo, et rien de plus. */
+    const before = await countRemaining(st, id);
+    const cleared = !!(before.checked
+      && !before.token && before.nonces === 0 && before.invites === 0
+      && !out.failed.token && !out.failed.nonces && !out.failed.invites
+      && !out.truncated);
+    if (cleared && before.profile) {
+      try { await st.delete(pKey); out.deleted.profile = true; }
+      catch (e) { out.failed.profile = true; }
+      /* 5. CONTROLE PAR RELECTURE, apres la seule suppression qui vient
+         d'avoir lieu. On ne deduit rien : on relit. */
+      const after = await countRemaining(st, id);
+      out.remaining = {
+        profile: after.profile, token: after.token,
+        nonces: after.nonces, invites: after.invites, checked: after.checked
+      };
+    } else {
+      /* DEUX SITUATIONS, un seul traitement.
+         a) Il reste quelque chose (ou le controle n'a pas abouti) : le
+            document est CONSERVE, volontairement -- 'kept_profile'.
+         b) Il n'y avait DEJA plus de document : c'est le rejeu d'une
+            suppression partielle anterieure, ou d'un etat abime. Il n'y a
+            rien a supprimer ici, et surtout rien a « garder » : le dire
+            serait faux.
+         Dans les deux cas, rien n'a ete touche depuis 'before' : le relire
+         dirait la meme chose et couterait une enumeration complete de plus. */
+      out.kept_profile = !!(before.profile && !cleared);
+      out.remaining = {
+        profile: before.profile, token: before.token,
+        nonces: before.nonces, invites: before.invites, checked: before.checked
+      };
+    }
+  });
+
+  return out;
+}
+
 /* Reponse 503 normalisee : le client doit pouvoir dire « stockage serveur »
    plutot que « hors-ligne ». */
 function storeFailure(e) {
@@ -1232,6 +1572,63 @@ async function fetchActivitiesPage(accessToken, afterEpoch, page, perPage, deadl
   }, [401], deadline);
 }
 
+/* ---------- revocation de l'autorisation Strava (chantier 3, etape 5) ------
+   DECOUVERTE DE L'ETAPE 5 : auth-logout ne supprime que la copie SERVEUR du
+   jeton. L'autorisation accordee a l'application restait active dans le
+   compte Strava de la personne -- invisible pour elle, et bien reelle.
+   Arbitrage d'Enzo : on ne revoque QU'A LA SUPPRESSION du profil. auth-logout
+   reste inchange, c'est son outil de depannage.
+
+   AU MIEUX, JAMAIS BLOQUANT. Une panne de Strava ne doit pas empecher une
+   suppression : cette fonction NE LEVE JAMAIS et rend un compte rendu que
+   l'appelant recopie dans sa reponse, pour qu'Enzo sache s'il reste une
+   autorisation a retirer a la main.
+
+   Le jeton d'acces stocke peut etre perime : on le rafraichit AVANT, sans
+   RIEN persister (il part a la poubelle dans l'instant qui suit).
+   Aucune valeur de jeton ne sort d'ici : ni dans le retour, ni dans un
+   journal. Seulement un booleen et un motif court. */
+const STRAVA_DEAUTH_URL = 'https://www.strava.com/oauth/deauthorize';
+async function revokeStravaToken(token, deadline) {
+  const out = { attempted: false, revoked: false, reason: 'no_token' };
+  if (!token || typeof token !== 'object') return out;
+
+  let access = (typeof token.access_token === 'string' && token.access_token) ? token.access_token : '';
+  if (!accessTokenIsFresh(token)) {
+    const clientId = env('STRAVA_CLIENT_ID');
+    const clientSecret = env('STRAVA_CLIENT_SECRET');
+    const refresh = (typeof token.refresh_token === 'string') ? token.refresh_token : '';
+    if (clientId && clientSecret && refresh) {
+      try {
+        const data = await refreshAccessToken(clientId, clientSecret, refresh, deadline);
+        if (data && typeof data.access_token === 'string' && data.access_token) access = data.access_token;
+      } catch (e) { /* on tentera avec le jeton d'acces deja en main */ }
+    } else if (!access) {
+      out.reason = (clientId && clientSecret) ? 'no_access_token' : 'config';
+      return out;
+    }
+  }
+  if (!access) { out.reason = 'no_access_token'; return out; }
+
+  out.attempted = true;
+  try {
+    /* Le jeton voyage dans l'en-tete Authorization, jamais dans l'URL : une
+       URL finit dans les journaux d'acces. */
+    await stravaJson(STRAVA_DEAUTH_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + access, 'Accept': 'application/json' }
+    }, [401], deadline);
+    out.revoked = true;
+    out.reason = 'ok';
+  } catch (e) {
+    /* CONSERVATEUR PAR CHOIX : tout ce qui n'est pas un succes franc est
+       rapporte comme « non revoque ». Annoncer a tort qu'une autorisation a
+       ete retiree serait bien pire que demander une verification inutile. */
+    out.reason = isStravaError(e) ? e.reason : 'network';
+  }
+  return out;
+}
+
 module.exports = {
   STATE_TTL_MS: STATE_TTL_MS,
   MIN_KEY_LEN: MIN_KEY_LEN,
@@ -1290,5 +1687,11 @@ module.exports = {
   configMissingApi: configMissingApi,
   FALLBACK_TOKEN_TTL_S: FALLBACK_TOKEN_TTL_S,
   CALL_RESERVE_MS: CALL_RESERVE_MS,
-  callTimeout: callTimeout
+  callTimeout: callTimeout,
+  purgeProfileData: purgeProfileData,
+  revokeStravaToken: revokeStravaToken,
+  probeProfileResidue: probeProfileResidue,
+  readProfileTombstone: readProfileTombstone,
+  markProfileDeleted: markProfileDeleted,
+  clearProfileTombstone: clearProfileTombstone
 };

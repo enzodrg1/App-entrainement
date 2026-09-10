@@ -11,8 +11,16 @@
 
    REGLES DURES
    - REFUS INDISCERNABLE. Code absent, malforme, inconnu, deja consomme,
-     expire, ou visant un profil desactive : MEME statut, MEME corps, et un
-     acces au stockage dans tous les cas pour que la duree ne trahisse rien.
+     expire, visant un profil desactive ou SUPPRIME : MEME statut, MEME
+     corps, et un acces au stockage dans tous les cas pour que la duree ne
+     trahisse rien.
+   - UN PROFIL SUPPRIME NE REVIENT JAMAIS A LA VIE ICI (etape 5). La
+     suppression pose une PIERRE TOMBALE ('deleted/<id>') AVANT de commencer
+     a effacer quoi que ce soit ; cette fonction la consulte a chaque remise.
+     Sans elle, une seule invitation oubliee -- par une enumeration
+     eventuellement coherente, ou par une purge interrompue -- suffisait a
+     recreer un profil ACTIF, avec une cle valide, pour quiconque detenait
+     encore le code.
      Sans cela, le site offrirait un oracle d'existence des codes ET des
      profils. Seule une panne de stockage se distingue (503), comme partout
      ailleurs : elle ne dit rien d'un profil en particulier.
@@ -32,8 +40,8 @@
      sur un profil qu'Enzo avait justement desactive. On refuse, on n'ecrit
      rien, et Enzo reparera le document depuis admin-profiles.
    - COUT DE STOCKAGE IDENTIQUE DANS TOUS LES REFUS que l'appelant peut
-     provoquer : EXACTEMENT une lecture d'invitation puis une lecture de
-     profil, dans cet ordre. Deux ecarts avaient survecu a la premiere
+     provoquer : EXACTEMENT une lecture d'invitation, une lecture de profil,
+     puis une lecture de pierre tombale, dans cet ordre. Deux ecarts avaient survecu a la premiere
      ecriture, et chacun etait un oracle : l'invitation EXPIREE coutait un
      'delete' de plus (« ce code a existe » devenait mesurable), et le profil
      n'etait lu QUE si l'invitation etait valide (un 'get' de moins dans les
@@ -148,8 +156,30 @@ exports.handler = async function (event) {
     try { found = await C.readProfileState(event, id); }
     catch (e) { return C.storeFailure(e); }
 
+    /* 3 bis. LE PROFIL A-T-IL ETE SUPPRIME ? (chantier 3, etape 5)
+       C'est la barriere qui empeche un code residuel de RESSUSCITER un
+       profil qu'Enzo a supprime. Elle ne depend ni de l'ordre des
+       suppressions, ni de la coherence de l'enumeration des invitations, ni
+       de la survie du document de profil -- c'est-a-dire d'aucune des trois
+       choses qui peuvent manquer au pire moment. La marque est posee AVANT
+       la purge : une suppression interrompue laisse donc un profil
+       injoignable, jamais un profil a moitie efface et rejoignable.
+       LECTURE SYSTEMATIQUE, y compris pour le LEURRE : le cout de stockage
+       d'un refus reste identique dans tous les cas (une invitation, un
+       profil, une pierre tombale, dans cet ordre), et l'indiscernabilite est
+       preservee. Une panne de lecture repond 503, comme les deux autres. */
+    let tomb = { state: 'none', doc: null };
+    try { tomb = await C.readProfileTombstone(event, id); }
+    catch (e) { return C.storeFailure(e); }
+
     // Les refus provoquables par l'appelant, tous au meme cout :
     if (!usable) return refuse();
+    /* Profil SUPPRIME (ou marque illisible : on ne ressuscite personne sur
+       la foi d'un document qu'on n'a pas su lire). Refus indiscernable, et
+       l'invitation n'est PAS consommee -- elle ne vaut de toute facon plus
+       rien, et Enzo peut lever la marque par 'create' s'il veut reutiliser
+       l'identifiant. */
+    if (tomb.state !== 'none') return refuse();
     // Document de profil ABIME : refus. On ne recree pas par-dessus -- ce
     // serait rendre actif, avec un created_at neuf, un profil desactive.
     if (found.state === 'invalid') return refuse();
