@@ -300,6 +300,13 @@ async function writeProfile(event, doc) {
   assertProfileId(doc && doc.id);
   return withStore(event, function (st) { return st.setJSON(PROFILE_PREFIX + doc.id, doc); });
 }
+/* Retire le document de profil. N'est employe QUE par 'join', pour annuler
+   sa propre ecriture quand une suppression du meme profil l'a devancee
+   (pierre tombale relue apres coup). Leve en cas d'echec : l'appelant decide. */
+async function deleteProfileDoc(event, profileId) {
+  const id = assertProfileId(profileId);
+  return withStore(event, function (st) { return st.delete(PROFILE_PREFIX + id); });
+}
 async function listProfiles(event) {
   const keys = await withStore(event, async function (st) {
     const res = await st.list({ prefix: PROFILE_PREFIX });
@@ -1648,6 +1655,7 @@ module.exports = {
   readProfile: readProfile,
   readProfileState: readProfileState,
   writeProfile: writeProfile,
+  deleteProfileDoc: deleteProfileDoc,
   listProfiles: listProfiles,
   cleanDisplayName: cleanDisplayName,
   DISPLAY_NAME_MAX: DISPLAY_NAME_MAX,

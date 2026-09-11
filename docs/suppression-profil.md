@@ -27,7 +27,9 @@ donnée : une marque `deleted/<id>` qui dit « cet identifiant a été supprimé
 écrite **avant** que quoi que ce soit ne soit effacé, et `join` la consulte à chaque
 tentative. C'est elle qui garantit qu'un code d'invitation oublié quelque part ne pourra
 plus jamais recréer le profil — même si la purge est interrompue, même si l'énumération
-du magasin n'a pas encore vu la dernière invitation émise. Seule l'action `create` la
+du magasin n'a pas encore vu la dernière invitation émise. (Seul un code remis
+*exactement pendant* la suppression demande une précaution : voir « Limite connue : une
+invitation remise pendant la suppression », à l'étape 3.) Seule l'action `create` la
 lève, et c'est volontaire : réutiliser un identifiant supprimé doit être un geste
 explicite (voir « Cas particuliers »).
 
@@ -197,9 +199,13 @@ garde-fou existe pour qu'une faute de frappe ne détruise pas le mauvais profil.
 }
 ```
 
-* `complete: true` → **il ne reste rien** côté serveur pour ce profil, **et** la pierre
-  tombale est posée. Ce n'est pas une déduction : `remaining` est **relu** dans le
-  magasin après la suppression, et la marque est **relue** après avoir été écrite.
+* `complete: true` → **plus rien de visible** côté serveur pour ce profil au moment de
+  l'appel, **et** la pierre tombale est posée. Ce n'est pas une déduction : `remaining`
+  est **relu** dans le magasin après la suppression, et la marque est **relue** après
+  avoir été écrite. Mais les nonces et les invitations sont retrouvés par
+  **énumération**, qui peut être en retard : une invitation émise juste avant peut ne pas
+  encore y figurer. Le filet complet est l'expiration des invitations (30 jours au plus),
+  voir « Recréer plus tard un profil du même identifiant » dans « Cas particuliers ».
 * `tombstone: true` → le profil est désormais **injoignable, quoi qu'il reste**. Aucun
   code d'invitation, même oublié dans un SMS, ne peut le recréer. C'est la garantie la
   plus forte de toute la procédure, et elle ne dépend ni de la réussite de la purge, ni
@@ -240,11 +246,15 @@ fonction d'aide te le montre — c'est tout l'intérêt).
 * le document de profil a été gardé (`kept_profile: true`) → le rejeu le retrouve
   normalement ;
 * le document a déjà disparu (état laissé par une version antérieure de la fonction) →
-  le rejeu **sonde d'abord les résidus** et les purge. Il ne répond `404` que s'il n'y a
-  vraiment plus rien.
+  le rejeu **sonde d'abord les résidus** et les purge. Il ne répond `404` que s'il ne
+  voit plus rien.
 
-Autrement dit : **tant qu'il reste quelque chose, un `delete` ne répond jamais `404`.**
-C'est ce qui rend le contrôle ci-dessous fiable.
+Autrement dit : **tant qu'il reste quelque chose de visible à l'énumération au moment de
+l'appel, un `delete` ne répond jamais `404`.** C'est ce qui rend le contrôle ci-dessous
+fiable, dans cette limite : une invitation que l'énumération ne montre pas encore
+échappe au contrôle. Le filet complet est l'expiration des invitations (30 jours au
+plus), voir « Recréer plus tard un profil du même identifiant » dans « Cas
+particuliers ».
 
 ### Vérifier qu'il ne reste vraiment rien
 
@@ -255,15 +265,57 @@ Le seul contrôle qui couvre tout, c'est de rejouer la suppression :
 Invoke-Admin @{ action = 'delete'; id = $id; confirm_id = $id }
 ```
 
-* `HTTP 404 not_found` → il ne reste **rien** : ni document, ni jeton, ni nonce, ni
-  invitation visant ce profil. C'est le résultat attendu, et c'est une bonne nouvelle.
-  Le corps porte `tombstone` : il doit valoir `true`.
-* `HTTP 200 complete: true` → il restait des résidus, ils viennent d'être purgés.
-  Rejoue encore une fois : tu dois obtenir `404`.
+* `HTTP 404 not_found` → **à l'instant de la relecture**, le magasin ne montrait plus
+  rien pour ce profil : ni document, ni jeton, ni nonce, ni invitation. C'est le
+  résultat attendu. Le corps porte `tombstone` : il doit valoir `true`.
+* `HTTP 200 complete: true` → il restait des résidus (ou un document de profil réapparu,
+  voir la limite ci-dessous), ils viennent d'être purgés. Rejoue encore une fois : tu dois
+  obtenir `404`.
 * `HTTP 500` → lis `remaining` et `tombstone`, et recommence quand la cause est levée.
+* `HTTP 409 profile_active` **alors que tu avais bien désactivé le profil** → une
+  invitation a été remise pendant la suppression (voir la limite ci-dessous). Refais
+  l'étape 2 (`set-active` à `$false`), puis rejoue la suppression.
 
 Ce contrôle **aboutit toujours** si le magasin répond : un document d'invitation abîmé
 ailleurs dans le magasin ne l'empêche plus (c'était un défaut, il est corrigé).
+
+### Limite connue : une invitation remise pendant la suppression
+
+Si la personne utilise un code d'invitation **exactement pendant** que tu supprimes son
+profil, les deux opérations se croisent. Chacune se protège de l'autre :
+
+* `join` relit la pierre tombale **après** avoir écrit le profil ; s'il la trouve, il
+  retire le document qu'il vient d'écrire et refuse le code — la clé neuve n'est remise
+  à personne. Si cette relecture échoue, il répond `503` sans remettre la clé et sans
+  rien supprimer (ce pourrait être un simple changement de téléphone). Le code, lui,
+  est **consommé** : il ne resservira pas (voir « Connexion qui échoue après la prise
+  du code (limite connue) », dans « Cas particuliers ») ;
+* `delete` relit le document de profil **après** avoir posé la pierre tombale ; s'il le
+  trouve, il le purge au lieu de répondre `404`.
+
+Chacune écrit **puis** relit l'objet de l'autre : au moins une des deux voit l'autre. Cette
+garantie suppose que le magasin rende immédiatement visible ce qui vient d'être écrit. Par
+défaut, Netlify Blobs ne le promet pas (cohérence « à terme », sauf si la variable
+`NETLIFY_BLOBS_CONSISTENCY` vaut `strong`). Dans une fenêtre très courte, un profil peut
+donc encore réapparaître. **Marche à suivre, qui couvre ce cas :** désactive d'abord le
+profil (étape 2) — ce qui ferme déjà l'accès —, supprime (étape 3), puis **rejoue la
+suppression jusqu'à obtenir `404`**, en refaisant l'étape 2 si tu reçois
+`409 profile_active`.
+
+**Cas non couvert : `delete` puis `create` du même identifiant, coup sur coup.** La
+relecture de `join` ne voit que l'état **présent** de la pierre tombale. Si tu enchaînes
+`delete` **puis** `create` du même identifiant pendant qu'une remise est en vol — les deux
+dans une fenêtre très courte (43 ms mesurées sur un magasin en mémoire, sans latence
+réseau ; en production elle contient trois à quatre allers-retours Blobs, donc
+vraisemblablement un ordre de grandeur de plus) —, la marque a été
+posée puis levée avant que `join` ne la relise : la remise **réussit, sur le profil
+recréé**. Selon l'ordre des écritures, soit la clé du détenteur de l'ancien code ouvre le
+nouveau profil (et la clé renvoyée par `create` ne marche plus), soit l'inverse. Rien
+dans le code ne l'empêche. **Consigne :** après un `delete`, **attends** avant un `create`
+du même identifiant — quelques minutes suffisent pour ce cas précis, bien au-delà de la
+durée d'une remise —, et émets l'invitation **après** le `create`, jamais avant. (La
+consigne de « Recréer plus tard un profil du même identifiant », dans « Cas
+particuliers », est plus stricte et couvre aussi ce cas.)
 
 ### Réponses d'erreur
 
@@ -316,17 +368,82 @@ son téléphone.
 > 2. Si tu veux garder une copie : onglet **Journal › Exporter**, d'abord.
 > 3. Tape **« Supprimer mes données de cet appareil »** et lis la confirmation en
 >    entier : elle dit ce qui est effacé **et ce qui ne l'est pas**.
-> 4. Il n'y a **qu'une seule question**. Elle porte sur ce qui est enregistré sous ton
->    profil, et sur rien d'autre.
-> 5. Lis le compte rendu jusqu'au bout. S'il commence par **« ⚠ Suppression
->    INCOMPLÈTE »**, recommence. S'il contient une ligne **« À VÉRIFIER »**, la
->    suppression a bien eu lieu, mais un point n'a pas pu être mesuré : lis-le. S'il dit
->    **« L'app n'a rien trouvé à supprimer »**, c'est qu'il n'y avait rien sous ton
->    profil sur cet appareil : rien n'a été effacé, et c'est dit tel quel plutôt que
->    présenté comme un succès.
+> 4. Il n'y a **qu'une seule question**. Elle porte sur tes données, enregistrées sous
+>    ton profil, et sur rien d'autre.
+> 5. Le compte rendu n'a que **deux formes possibles** :
+>    * **« Tes données ont été supprimées de cet appareil. »** → c'est fini pour cet
+>      appareil ;
+>    * **« La suppression n'est pas complète : une partie de tes données est peut-être
+>      encore sur cet appareil. Réessaie ; si ça persiste, contacte Enzo. »** →
+>      recommence ; si le message revient, préviens Enzo.
+>
+>    Les deux sont suivis des trois rappels « ne sont pas supprimés » (autre appareil,
+>    compte serveur, autorisation Strava).
 > 6. Recommence sur **chaque appareil** où tu as utilisé l'app.
 
 Ça fonctionne **hors-ligne** : aucun appel réseau.
+
+### Comment l'app décide entre les deux messages
+
+Le premier message ne s'affiche **que si une relecture le prouve**, après la
+suppression :
+
+1. chaque clé visée sous le profil est **relue absente** ;
+2. le stockage, **ré-énuméré**, ne porte plus rien sous le préfixe du profil, hormis
+   deux marques techniques que la suppression garde exprès : `<profil>:legacy-owner`
+   (un booléen) et `<profil>:storage-removed` (une liste de noms de clés retirées,
+   voir plus bas). Elles ne sont acceptées que si leur **valeur, relue**, a exactement
+   la forme que l'app leur donne : `true` ou `false` pour la première, une liste dont
+   chaque nom est `plan-override`, `tgcm-strava-cache` ou `tgcm-probe` pour la seconde.
+   C'est ce contrôle qui permet d'affirmer qu'**aucune des deux ne contient de donnée
+   d'entraînement ou de santé** ; toute autre valeur donne le second message ;
+3. **aucune ancienne copie sans profil** n'est lisible pour ce profil (voir « Ce que
+   cette suppression ne fait pas »).
+
+Tout le reste donne le second message — y compris quand la cause est bénigne. L'app ne
+cherche plus à dire *pourquoi* : chaque explication précise (décomptes, provenance,
+promesses) avait fini par être fausse dans une combinaison d'états, sur cinq passes de
+test. Cas où le second message est **attendu** et ne se résout pas en réessayant :
+
+* **le téléphone d'Enzo** (voir ci-dessous) ;
+* un stockage qui **ne sait pas lister ses clés** (l'app ne peut pas prouver qu'il ne
+  reste rien) ;
+* un stockage qui **ne sait pas retirer une clé** et se contente d'en écraser le contenu
+  par `null` : la donnée est détruite, mais la clé est toujours là ;
+* une des **deux marques techniques** du point 2 dont la valeur relue n'a pas la forme
+  attendue : ni `rememberLegacyOwner()` ni `tombAdd()` ne réécrivent une valeur déjà
+  présente, donc aucun geste dans l'app n'en sort — et c'est voulu, puisque l'app ne peut
+  pas prouver que cette valeur ne porte pas de donnée.
+
+Les deux cas de stockage ci-dessus ne concernent pas un iPhone (qui utilise `localStorage`).
+
+Après la suppression, **quel que soit le message**, l'app **relit le stockage** et
+affiche exactement ce qui s'y trouve encore. Une suppression partielle ne peut donc plus
+laisser l'app vide alors que des séances sont toujours enregistrées — la coche suivante
+les aurait écrasées. **Le plan aussi** est choisi de nouveau, comme au démarrage, à
+partir du stockage : un plan importé qui vient d'être effacé ne reste ni actif, ni
+affiché (« plan importé »), ni dans un export fait juste après. Le plan par défaut
+reprend sa place ; l'app le prend dans sa mémoire (c'est `plan.json`, le même pour tout
+le monde), sans appel réseau. Si ce plan par défaut venait du cache hors-ligne, que la
+suppression vient d'effacer, la ligne de version le dit : « plan par défaut (hors-ligne,
+en mémoire seulement) ». S'il n'y en a pas du tout en mémoire — app ouverte hors-ligne
+avec un plan importé —, l'écran « Plan indisponible » s'affiche avec **un seul**
+message, vrai : « Aucun plan n'est enregistré sur cet appareil. Touche « Réessayer »
+pour charger le plan par défaut (une connexion est nécessaire). » Et si `plan.json` est
+simplement **encore en route** (réseau lent) pour le chargement du plan — au démarrage,
+ou après « Réessayer » —, l'app affiche « Chargement du plan… » au lieu de « Plan
+indisponible », puis le plan dès son arrivée. **Exception : le bouton « Plan par
+défaut ».** S'il était en cours au moment de la suppression, et qu'aucun plan n'est en
+mémoire, l'app affiche « Plan indisponible » avec le message ci-dessus — c'est vrai à
+cet instant —, et le plan que ce bouton télécharge est **jeté à son arrivée** (il n'est
+ni affiché, ni enregistré). « Réessayer » charge alors le plan par défaut normalement.
+
+La fenêtre de confirmation ne promet rien qu'elle ne puisse tenir : elle dit ce qui
+sera effacé, ce qui ne le sera pas, et que **si une partie ne peut pas être effacée,
+l'app le dira à la fin**. Sur le téléphone d'Enzo seulement, elle ajoute que ses
+anciennes copies d'avant la mise à jour ne sont pas effacées et restent affichables.
+(Une version précédente affirmait « l'app repart vide » : c'était faux chez Enzo et
+après toute suppression partielle.)
 
 ### Ce que cette suppression ne fait pas
 
@@ -336,10 +453,11 @@ d'avant la mise à jour de l'app (chantier 3, étape 1). **Cette version ne sait
 effacer, et aucun chemin de code ne le peut** — la seule écriture hors préfixe de tout le
 fichier est l'ancre `profile-id`, et elle ne prend même pas de nom de clé en paramètre.
 
-En pratique, **un seul appareil au monde en porte : celui d'Enzo.** Les amis arrivent par
-invitation, et un appareil qui rejoint n'écrit jamais que sous son préfixe. Ces copies
-**restent donc sur le téléphone d'Enzo**, gelées, jusqu'à une version prévue pour les
-effacer.
+En pratique, **seul le téléphone d'Enzo en porte** : ce sont ses données d'avant la
+mise à jour. Les amis arrivent par invitation, et l'app n'écrit jamais d'ancienne clé —
+la seule clé sans préfixe qu'elle écrive est l'ancre `profile-id`, qui ne contient qu'un
+identifiant. Ces copies **restent donc sur le téléphone d'Enzo**, gelées, jusqu'à une
+version prévue pour les effacer.
 
 Une **seconde question** (« Effacer aussi tes anciennes copies ? ») a existé pendant le
 développement de l'étape 5. **Elle a été retirée**, sur arbitrage d'Enzo : quatre passes
@@ -350,42 +468,69 @@ qu'elles n'étaient pas à la personne, et la marque écrite au passage refermai
 définitivement la porte. Si tu croises une capture d'écran ou une note qui mentionne
 cette seconde question, **elle est périmée**.
 
-Ce qui reste du mécanisme, et c'est voulu : la suppression **ferme le repli** sur ces
-copies (elle écrit `<profil>:legacy-owner` à `false`). Fermer le repli n'efface rien —
-c'est ce qui garantit que les données ne réapparaissent pas juste après que la personne a
-demandé leur effacement.
+**La suppression ne ferme plus aucun « repli ».** Une version précédente écrivait
+`<profil>:legacy-owner` à `false` pour que ces copies ne soient plus lues, et promettait
+qu'elles ne réapparaîtraient pas. Cette écriture et cette promesse **ont été retirées**.
+La marque `<profil>:legacy-owner` n'est désormais **ni effacée ni réécrite** par la
+suppression :
 
-**État de l'app après coup, et c'est voulu :** même profil, app vide. L'app ne repasse
-pas par l'écran de première connexion — l'ancre `profile-id`, qui ne contient qu'un
-identifiant et aucune donnée de santé, est conservée. Rien ne réapparaît au rechargement.
-Si la personne veut revenir plus tard, une nouvelle clé d'appareil saisie dans Zones
-suffit — **mais si tu as fait l'étape 3, ce profil n'existe plus, et une invitation ne
-suffira pas non plus** : il faut d'abord rouvrir l'identifiant avec `create` (voir « Cas
-particuliers »), sans quoi `join` refusera le code.
+* **pour un ami** (profil arrivé par invitation), elle vaut `false` et le reste : l'app
+  ne lit jamais les copies sans profil de l'appareil, ni avant ni après, et sa première
+  coche après la suppression n'enregistre que la sienne. La garder permet aussi à l'app
+  de redémarrer normalement sur un appareil partagé ;
+* **pour Enzo sur son propre téléphone**, elle vaut `true` : ses anciennes copies sont
+  les siennes, elles restent lisibles par l'app après la suppression, et l'app les
+  affiche de nouveau. Le compte rendu dit donc **« La suppression n'est pas
+  complète »** — c'est vrai, et c'est voulu : ses données d'avant la mise à jour sont
+  toujours sur le téléphone. Comme avant la suppression, la première coche qui suit les
+  enregistre sous `enzo:`.
 
-**Si l'app lui affichait des données venues de ses anciennes copies** (cas d'un
-téléphone utilisé avant la mise à jour), le compte rendu commence par le dire : « Ce que
-l'app t'affichait venait de tes anciennes copies SANS PROFIL… ». C'est plus honnête que
-d'annoncer « aucune donnée n'était enregistrée sous ton profil » à quelqu'un qui voyait
-son historique une seconde plus tôt — les deux phrases sont vraies, mais dans cet
-ordre-là seulement.
+**État de l'app après coup :** même profil, et l'app affiche ce que le stockage contient
+encore — rien pour un ami dont la suppression a réussi, et le plan par défaut à la
+place d'un plan importé effacé. Elle ne repasse pas par l'écran
+de première connexion : l'ancre `profile-id`, qui ne contient qu'un identifiant et aucune
+donnée de santé, est conservée. Si la personne veut revenir plus tard, une nouvelle clé
+d'appareil saisie dans Zones suffit — **mais si tu as fait l'étape 3, ce profil n'existe
+plus, et une invitation ne suffira pas non plus** : il faut d'abord rouvrir
+l'identifiant avec `create` (voir « Cas particuliers »), sans quoi `join` refusera le
+code.
 
-Le panneau **« Vérifier mes données »** (onglet Zones) dit ensuite la vérité sur ce qui
-reste sur l'appareil. **Il ne dit jamais à qui sont les copies sans profil**, ni dans un
-sens ni dans l'autre : il décrit ce que l'app en fait — « l'app ne les affiche pas, ne
-les modifie pas et ne les supprime pas ». C'est vrai pour quelqu'un arrivé par invitation
-(ces copies ne sont pas les siennes) **comme** pour Enzo après sa propre suppression
-(elles sont les siennes, mais le repli est fermé). L'app ne sait pas distinguer les deux
-cas, et une version antérieure affirmait le premier dans les deux — elle disait donc à
-Enzo que ses propres données n'étaient pas les siennes.
+Le panneau **« Vérifier mes données »** (onglet Zones) ne montre à un ami **que ses
+propres données** : l'app n'y lit même pas les copies sans profil, et n'affiche donc
+jamais ni leur existence, ni un décompte, ni une comparaison. Seul le propriétaire prouvé
+de ces copies (Enzo sur son téléphone) voit, en plus, ce que l'app lit depuis son
+ancienne copie et la comparaison caractère par caractère.
 
-Il dit **la même chose que le compte rendu**, y compris sur les téléphones dont le
-stockage ne sait pas retirer une clé et se contente d'en écraser le contenu : une clé
-vidée y est comptée pour ce qu'elle est, une absence.
+Sur un stockage qui écrase au lieu de retirer, le panneau compte une clé vidée (`null`)
+comme une absence — son contenu est parti — pendant que le compte rendu dit « pas
+complète » — la clé, elle, est toujours là. Les deux sont exacts.
 
-**Ce qui reste après cette étape :** rien sous son profil sur cet appareil-là. Les copies
-sans profil, elles, restent (voir « Ce que cette suppression ne fait pas »). Les autres
-appareils sont intacts.
+**La liste des retraits `<profil>:storage-removed` n'est pas effacée non plus.** L'app
+n'y écrit que des **noms de clés** (au plus : `plan-override`, `tgcm-strava-cache`,
+`tgcm-probe`), aucune donnée d'entraînement ni de santé — et la suppression le
+**vérifie** : une liste qui contiendrait autre chose donne « La suppression n'est pas
+complète », sans que la liste soit effacée ni réécrite. Elle se remplit **toute seule
+dès le premier démarrage** : l'app vérifie qu'elle peut écrire sur une clé jetable
+(`tgcm-probe`) puis la retire, et ce retrait y inscrit `tgcm-probe`. Elle se remplit
+aussi quand la personne retire elle-même quelque chose : « Plan par défaut » (plan
+importé retiré), « Déconnecter » Strava (cache d'activités purgé). Sur le téléphone d'Enzo, elle empêche
+l'app de relire l'**ancienne** copie sans profil de ces clés. Une version précédente
+l'effaçait avec le reste : l'ancien plan importé qu'Enzo avait retiré, et l'ancien cache
+Strava qu'il avait purgé, réapparaissaient après la suppression. Pour un ami, elle ne
+change rien : son app ne lit jamais les copies sans profil.
+
+**Ce qui reste après cette étape**, quand le compte rendu dit « Tes données ont été
+supprimées de cet appareil » : sous son profil, au plus les deux marques techniques
+`<profil>:legacy-owner` (relue : `true` ou `false`) et `<profil>:storage-removed`
+(relue : une liste de noms de clés parmi les trois admis) — aucune donnée ; hors profil,
+l'ancre `profile-id` (un identifiant). Les copies sans profil, s'il y en a, restent (voir
+« Ce que cette suppression ne fait pas »). Les autres appareils sont intacts.
+
+Cela reste vrai **après** coup, même si une opération réseau était en cours au moment
+de la suppression : synchro Strava, « Vérifier », « Connecter Strava », « Déconnecter »,
+« Plan par défaut », ou chargement du plan. À son retour, elle n'écrit plus rien sous
+le profil et n'affiche aucun message (auparavant, « Plan par défaut » réécrivait le cache
+du plan et « Déconnecter » une liste de retraits, après le compte rendu « supprimées »).
 
 ---
 
@@ -434,7 +579,8 @@ Récapitule à la personne, par écrit :
 
 * profil serveur supprimé le … (avec `complete: true` **et** `tombstone: true`, puis un
   `404` au contrôle) ;
-* données de ses appareils : supprimées par elle sur *n* appareils ;
+* données de ses appareils : supprimées par elle sur *n* appareils (sur chacun, le
+  compte rendu doit être « Tes données ont été supprimées de cet appareil. ») ;
 * autorisation Strava : révoquée automatiquement / retirée à la main par elle ;
 * ce qui subsiste ailleurs et qui n'appartient pas à l'app : ses activités **sur Strava
   lui-même** (l'app n'en a jamais été propriétaire), et les exports JSON qu'elle ou toi
@@ -467,9 +613,12 @@ Invoke-Admin @{ action = 'create'; id = $id; name = 'a supprimer' }
 La clé renvoyée par ce `create` est à jeter : elle n'existe que le temps de reprendre la
 procédure.
 
-**Profil déjà supprimé.** Un second `delete` répond `404 not_found` **s'il ne reste
-vraiment rien**. S'il restait des résidus, il les purge et répond `200` — c'est
-justement le contrôle recommandé plus haut. Dans les deux cas, rien n'est recréé.
+**Profil déjà supprimé.** Un second `delete` répond `404 not_found` **s'il ne voit plus
+rien** au moment de l'appel — l'énumération des nonces et des invitations peut être en
+retard, voir « Recréer plus tard un profil du même identifiant » ci-dessous pour le filet
+complet (expiration des invitations, 30 jours au plus). S'il restait des résidus
+visibles, il les purge et répond `200` — c'est justement le contrôle recommandé plus
+haut. Dans les deux cas, rien n'est recréé.
 
 **Invitations illisibles (`invitations_illisibles_globales:<n>`).** Un document
 d'invitation abîmé n'est supprimé par personne : il ne dit pas quel profil il vise, et
@@ -507,6 +656,28 @@ Si tu émets une invitation **sans** avoir fait le `create`, la réponse porte
 `"profile_deleted": true` : le code sera refusé par `join`, silencieusement (le refus est
 volontairement indiscernable, la personne ne verra qu'« invitation invalide »).
 
+**Avant ce `create`, ce qui peut rester.** `create` lève la pierre tombale sans purger
+quoi que ce soit : toute invitation encore valable pour cet identifiant redevient
+utilisable, et elle régénérerait la clé du **nouveau** profil — la nouvelle personne
+perdrait son accès au profit du détenteur de l'ancien code. Rejouer `delete` jusqu'à
+`404` reste utile (ça purge ce qui est visible), mais ce `404` dit seulement
+qu'**aucune invitation n'était visible au moment du rejeu** : l'énumération du magasin
+peut être en retard et ne pas encore montrer la dernière invitation émise. Ce n'est pas
+une garantie qu'il n'en reste aucune.
+
+Le seul filet complet est l'**expiration** : une invitation cesse de fonctionner au
+plus tard **30 jours après son émission** (`ttl_days` vaut 7 par défaut, 30 au maximum ;
+la date exacte est dans `expires_at`, dans la réponse de `invite`). **Recommandation :
+ne recrée un identifiant supprimé que 30 jours après la dernière invitation émise pour
+lui** (avant ou après la suppression), **ou prends un autre identifiant** (`julie2`, par
+exemple) — les données éventuellement restées sur un appareil sous l'ancien
+identifiant n'apparaîtront alors pas sous le nouveau. Ce délai couvre aussi le cas
+« `delete` puis `create` coup sur coup » de l'étape 3. (Faire purger ces invitations par
+`create` lui-même demanderait un mécanisme nouveau ; ce n'est pas fait.) Même raison
+pour l'ordre recommandé ci-dessus : une invitation émise **avant** le `create`, pendant
+que l'identifiant est marqué, deviendra valable dès la levée de la marque — émets-la
+plutôt **après**.
+
 **`delete` sur un identifiant qui n'a jamais existé.** Il répond `404` — et il pose quand
 même la pierre tombale. C'est assumé : le serveur ne peut pas distinguer « cet
 identifiant n'a jamais servi » de « une suppression précédente a laissé des résidus que
@@ -536,6 +707,73 @@ Cet écran ne s'affiche que si l'app a **réellement pu lire** le stockage. Si u
 proposer de rejoindre : proposer de rejoindre à quelqu'un dont on n'a pas su lire
 l'historique, ce serait lui proposer de passer par-dessus.
 
+**« Cet appareil ne peut pas être rattaché à un profil pour l'instant ».** L'appareil
+porte une ancienne clé d'appareil sans profil, au format d'avant l'étape 2 (ou vidée),
+et aucune marque d'héritage : l'app ne peut pas décider à qui sont les données déjà
+présentes, et elle refuse d'enregistrer un profil par-dessus. Elle le sait **avant**
+d'appeler le serveur : **le code d'invitation n'est pas utilisé**, la personne peut le
+garder. Elle lui dit de ne pas réessayer et de te contacter. Cette version n'a aucun
+geste dans l'app pour débloquer ce cas : c'est à toi de voir à qui est cet appareil
+avant toute chose. (Avant, chaque essai consommait une invitation, et le message
+laissait croire que la suivante marcherait.) Si l'échec n'est pas certain à l'avance,
+l'appel a lieu comme avant ; s'il échoue ensuite sur l'appareil, le message ne
+promet plus qu'une nouvelle invitation suffira : il demande de t'en parler d'abord.
+
+**Connexion qui échoue après la prise du code (limite connue).** Une
+invitation prise par `join` est **consommée, point** : rien ne la rend, même si la
+remise de la clé échoue ensuite. Trois façons d'y arriver :
+
+* le stockage Netlify tombe en panne à l'écriture du profil ou à la relecture de la
+  pierre tombale → « La connexion n'a pas abouti (HTTP 503 · blobs) » ;
+* la fabrication de la clé échoue → « La connexion n'a pas abouti (HTTP 500 ·
+  server_error) » ;
+* la **réponse se perd en route** : le serveur a pu traiter la demande jusqu'au bout
+  (code pris, voire clé fabriquée et profil réécrit), mais le téléphone ne reçoit
+  rien → « Le serveur n'a pas répondu en 12 s » (délai dépassé) ou « Aucune réponse
+  du serveur » (pas de connexion, connexion coupée, site inaccessible).
+
+Dans tous ces cas la personne n'a pas de clé, et son code sera refusé au nouvel essai
+**s'il avait été pris**. Sur un changement de téléphone, son **ancienne** clé peut aussi
+avoir cessé de marcher (le profil a pu être réécrit avec la nouvelle). **Remède : envoie
+un nouveau lien** (`action = 'invite'`, même `id`). Aucune donnée n'est perdue : les
+séances et le journal sont sur son téléphone, le jeton Strava n'est pas touché. L'app ne
+peut pas savoir si le code a été consommé ou non — sans réponse, elle ne sait même pas
+si la demande est arrivée ; ses messages sont donc écrits pour être vrais dans les deux
+cas, et se terminent tous les quatre par la même consigne : réessayer « avec le même
+code ; s'il est refusé, demande un nouveau lien à Enzo ».
+*Pourquoi on ne rend pas le code :* un mécanisme qui le rendait a existé pendant le
+développement de l'étape 5, et **il a été retiré**. Un code rendu survivait à une
+suppression pourtant terminée par `404`, et pouvait ensuite prendre un profil recréé plus
+tard sous le même identifiant ; deux remises simultanées pouvaient rouvrir un code déjà
+utilisé avec succès et tuer la clé de celui qui l'avait obtenue ; et un code pouvait
+expirer pendant la remise ratée. Chacun de ces défauts était plus grave que la panne
+qu'il rattrapait. Si tu croises une note qui dit « le même code resservira », **elle est
+périmée**.
+
+**Deux personnes utilisent le même code au même moment (limite connue, antérieure à
+l'étape 5).** La prise du code s'écrit puis se relit ; le magasin n'offre pas d'opération
+atomique pour la rendre exclusive. Si deux remises du même code se croisent exactement
+(deux appareils, ou le lien ouvert dans deux onglets), les deux peuvent recevoir une
+clé, et **seule la dernière écrite fonctionne**. Un même écran de connexion n'envoie
+jamais deux remises à la fois ; le cas suppose donc un code utilisé à deux endroits en
+même temps. Le symptôme : une personne connectée dont la clé d'appareil est ensuite
+refusée par le serveur. **Remède : un nouveau lien** pour elle. Rien n'est perdu.
+
+**Téléphone d'Enzo dans l'état « ambigu » : rejoindre un AUTRE profil (limite connue,
+téléphone d'Enzo uniquement).** La vérification faite avant d'appeler le serveur
+(« Cet appareil ne peut pas être rattaché à un profil pour l'instant ») ne sait
+conclure que s'il n'y a **aucune** marque de profil sur l'appareil. Sur le téléphone
+d'Enzo, sa propre marque `enzo:legacy-owner` existe : si l'appareil est dans l'état
+« ambigu » (plusieurs profils, ancre perdue), que son ancienne clé d'appareil sans
+profil n'est pas attribuable, et qu'on y utilise une invitation pour un profil **qui
+n'a pas encore de marque sur cet appareil** (un nouvel ami, par exemple), l'appel a
+lieu, le code est consommé, et l'app répond « L'invitation a été acceptée, mais cet
+appareil n'a pas pu enregistrer ton profil ». Rien n'est effacé ni écrit sous un profil.
+Le cas ne peut pas se produire ailleurs : seul le téléphone d'Enzo porte des anciennes
+clés. **Remède :** ne pas rattacher d'autre profil au téléphone d'Enzo ; si c'est
+arrivé, émettre un nouveau lien pour la personne et l'utiliser sur **son** appareil.
+Rejoindre **son propre** profil (`enzo`) depuis ce téléphone fonctionne.
+
 ---
 
 ## Ce qu'aucune étape ne fait
@@ -554,7 +792,9 @@ l'historique, ce serait lui proposer de passer par-dessus.
   règle : `delete ju` pose `deleted/ju`, jamais `deleted/julie`.
 * **La pierre tombale n'efface rien et ne contient rien.** Elle ne fait qu'interdire à
   `join` de recréer l'identifiant. Elle ne bloque ni `list`, ni `set-active`, ni
-  `rotate`, et elle n'empêche pas une clé d'accès existante de fonctionner — de toute
-  façon, après une suppression complète, il n'existe plus de document de profil pour la
-  vérifier.
+  `rotate`, et **elle n'est pas consultée par la vérification des clés d'accès** : ce qui
+  rend une clé inutilisable, c'est l'absence du document de profil (ou sa
+  désactivation). D'où l'ordre de la procédure — désactiver **avant** de supprimer — et
+  le contrôle final par `404`, qui relit que le document n'existe plus (voir « Limite
+  connue : une invitation remise pendant la suppression »).
 * **Rien de tout cela ne touche `auth-logout`.** Il reste ce qu'il était.

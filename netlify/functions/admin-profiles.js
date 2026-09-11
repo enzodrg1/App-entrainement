@@ -299,8 +299,13 @@ exports.handler = async function (event) {
            qui ils visent. L'y compter faisait repondre « il reste quelque
            chose » pour tous les profils a la fois, y compris ceux qui n'ont
            jamais existe. */
-        const leftovers = !!(residue.token || residue.nonces || residue.invites
-          || !residue.checked);
+        /* `residue.profile` : le document etait absent a la PREMIERE lecture,
+           mais la sonde passe APRES la pierre tombale. S'il est la
+           maintenant, une remise 'join' concurrente vient de le recreer
+           (defaut m7) : on ne repond pas 404 par-dessus un profil
+           ressuscite, la purge le retire. */
+        const leftovers = !!(residue.profile || residue.token || residue.nonces
+          || residue.invites || !residue.checked);
         if (!leftovers) return C.json(404, { error: 'not_found', tombstone: tombstone });
       }
 
@@ -478,7 +483,19 @@ exports.handler = async function (event) {
          profil n'existe pour les recevoir.
          Si la levee echoue, on le DIT : 'join' continuerait de refuser toutes
          les invitations de ce profil, et rien dans la reponse ne l'aurait
-         laisse deviner. */
+         laisse deviner.
+         LIMITE, dite : la levee ne PURGE AUCUNE INVITATION. Toute invitation
+         encore valable pour cet identifiant redevient utilisable ici. Rejouer
+         'delete' jusqu'a 404 purge ce qui est VISIBLE, mais ce 404 dit
+         seulement qu'aucune invitation n'etait visible au moment du rejeu :
+         l'enumeration list() peut etre en retard. Le seul filet complet est
+         l'EXPIRATION : 30 jours au plus apres l'emission (INVITE_TTL_DAYS_MAX).
+         D'ou la consigne (docs/suppression-profil.md, « Recreer plus tard ») :
+         ne recreer un identifiant supprime que 30 jours apres sa derniere
+         invitation, ou prendre un autre identifiant.
+         purgeProfileData n'est pas employee ici : elle efface aussi le
+         jeton, les nonces et le document de profil, et un 'create' qui la
+         lancerait devrait gerer une purge incomplete. */
       let cleared = false;
       try { cleared = await C.clearProfileTombstone(event, id); }
       catch (e) { cleared = false; }

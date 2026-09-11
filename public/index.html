@@ -277,7 +277,7 @@ body.joining{overflow:hidden}
     <input class="io" type="text" id="joinname" placeholder="Affiché dans l'app" autocomplete="off" spellcheck="false" maxlength="40">
     <button class="btn primary" id="joingo" type="button" style="width:100%; margin-top:14px">Rejoindre</button>
     <div class="note plan-msg hidden" id="joinmsg"></div>
-    <button class="btn ghost hidden" id="joinforce" type="button" style="width:100%; margin-top:10px">Continuer sans enregistrer</button>
+    <button class="btn ghost hidden" id="joinforce" type="button" style="width:100%; margin-top:10px">Continuer vers l'app</button>
     <button class="btn ghost hidden" id="joinreadonly" type="button" style="width:100%; margin-top:10px">Continuer sans rejoindre (lecture seule)</button>
     <p class="note">Le code ne sert <b>qu'une fois</b> et n'ouvre l'accès qu'à ton propre profil : ton plan, ton journal, tes courses. Personne d'autre ne les voit.</p>
     <p class="note">Une connexion internet est nécessaire pour cette étape, et pour elle seule. Ensuite l'app fonctionne hors-ligne, comme d'habitude.</p>
@@ -424,7 +424,7 @@ body.joining{overflow:hidden}
   <div class="card">
     <h3>🗂 Vérifier mes données</h3>
     <p class="note" id="verifymode" style="margin-top:0"></p>
-    <p class="note">Pour chaque donnée : d'où vient ce que l'app affiche, combien elle en contient, et — quand les deux copies existent — leur comparaison <b>caractère par caractère</b>. Cette vérification ne modifie ni ne supprime rien, tu peux la relancer autant de fois que tu veux.</p>
+    <p class="note">Pour chaque donnée : ce que l'app trouve pour ton profil sur cet appareil, avec un décompte quand la donnée s'y prête. Cette vérification ne modifie ni ne supprime rien, tu peux la relancer autant de fois que tu veux.</p>
     <div class="frow" style="margin-top:8px"><button class="btn ghost" id="verifydata" type="button">Vérifier mes données</button></div>
     <ul class="vlist" id="verifylist"></ul>
     <p class="note hidden" id="verifymsg"></p>
@@ -668,41 +668,29 @@ async function rawSet(phys, str){
   try{ localStorage.setItem(phys, str); return true; }catch(e){}
   return false;
 }
-/* {ok, substituted}. « substituted » : le backend ne sait NI supprimer NI
-   retirer (window.storage sans delete() ni remove()). La valeur est alors
-   ECRASEE par "null" -- la donnee est bien detruite, mais la CLE subsiste.
-   Ce detail doit remonter : sans lui, la relecture voyait une cle encore
-   presente et le compte rendu annoncait « n'a pas pu être effacée » pour une
-   donnee pourtant partie. Message exactement inverse de la realite.
+/* SUBSTITUTION : un backend qui ne sait NI supprimer NI retirer
+   (window.storage sans delete() ni remove()) voit sa valeur ECRASEE par
+   "null" -- la donnee est detruite, mais la CLE subsiste. sget() lit cette
+   valeur comme une absence. La suppression sur l'appareil, elle, exige que
+   la cle ait DISPARU : une cle substituee n'y compte pas comme supprimee.
    La substitution ne vaut QUE sous le prefixe du profil : isProfileKey()
    filtre en premier, et AUCUNE porte ne mene aux anciennes cles non
    prefixees -- cette version ne les efface jamais (cf. le bloc « LES
    ANCIENNES CLES NON PREFIXEES »). */
-async function rawDelDetailed(phys){
-  const res = {ok:false, substituted:false};
-  if(!isProfileKey(phys)) return res;            // garde structurelle
+async function rawDel(phys){
+  if(!isProfileKey(phys)) return false;          // garde structurelle
   let st = null;
-  try{ st = winStore(); }catch(e){ return res; }
+  try{ st = winStore(); }catch(e){ return false; }
   if(st){
     try{
       if(st.delete) await st.delete(phys);
       else if(st.remove) await st.remove(phys);
-      else { await st.set(phys, "null"); res.substituted = true; }
-    }catch(e){ return res; }
-    res.ok = true;
-    return res;
+      else await st.set(phys, "null");
+    }catch(e){ return false; }
+    return true;
   }
-  try{ localStorage.removeItem(phys); res.ok = true; return res; }catch(e){}
-  return res;
-}
-/* Signature historique, inchangee pour tous les appelants existants.
-   La garde structurelle est REPETEE ici : elle est deja dans
-   rawDelDetailed, et elle doit rester lisible a l'endroit ou tout le
-   fichier appelle. Deux barrieres valent mieux qu'une indirection. */
-async function rawDel(phys){
-  if(!isProfileKey(phys)) return false;          // garde structurelle
-  const r = await rawDelDetailed(phys);
-  return r.ok;
+  try{ localStorage.removeItem(phys); return true; }catch(e){}
+  return false;
 }
 /* SEULE ecriture hors prefixe de tout le fichier, et la garde qui la rend
    sure n'est pas une verification mais une SIGNATURE : cette fonction ne
@@ -741,33 +729,20 @@ async function rawSetAnchor(str){
    est retiree, ses anciennes copies restent GELEES comme decide a l'etape 1,
    et leur effacement fera l'objet d'une version prevue pour ca.
 
-   CE QUI RESTE, ET C'EST VOULU : `<profil>:legacy-owner` est ecrit a false
-   lors de la suppression sur l'appareil, pour que le repli soit ferme et que
-   les anciennes copies ne REAPPARAISSENT pas juste apres qu'on a demande
-   l'effacement. Fermer le repli n'efface rien. */
-/* CE QU'ON APPELLE « UNE DONNEE » DANS LE COMPTE RENDU DE SUPPRESSION.
-   Les reglages internes (marque d'heritage, pierres tombales, date
-   d'export, nom affiche, sonde, caches) sont bien effaces, mais les
-   compter faisait annoncer « Supprimé : 4 données » sur un profil ou il n'y
-   avait rien. */
+   LA SUPPRESSION NE TOUCHE PAS NON PLUS A `<profil>:legacy-owner`.
+   Elle ne l'efface pas et ne la reecrit pas. Une version precedente
+   « fermait le repli » en l'ecrivant a false apres coup ; cette ecriture et
+   les promesses qu'elle portait (« elles ne réapparaîtront pas ») ont ete
+   RETIREES. Consequence voulue : LEGACY_OWNER a false n'a plus qu'un seul
+   sens -- « ce profil n'est pas le proprietaire prouve des anciennes cles »
+   -- et plus jamais « il l'est, mais il a demande qu'on ne les lise plus ».
+   Le proprietaire (Enzo, sur son seul appareil) garde donc l'acces a ses
+   anciennes copies apres une suppression, et le compte rendu le dit
+   honnetement : la suppression n'est pas complete (cf. wipeOwnKeys). */
+/* CE QU'ON APPELLE « UNE DONNEE D'ENTRAINEMENT » dans le panneau « Vérifier
+   mes données ». Les reglages internes (marque d'heritage, pierres tombales,
+   date d'export, nom affiche, sonde, caches) n'en sont pas. */
 const WIPE_DATA_KEYS = ["tgcm-done", "tgcm-log", "tgcm-races", "plan-override"];
-/* NOMME UN LOT DE CLES QUI ONT RESISTE, en distinguant les donnees des
-   reglages. Rend aussi l'accord : `pl` (pluriel) et `f` (feminin, seulement
-   si le lot ne contient QUE des donnees -- « 3 données ... effacées », mais
-   « 3 données et 1 cache ... effacés »). Appele uniquement quand le lot
-   n'est pas vide. */
-function wipeLot(nData, nTech){
-  const p = [];
-  if(nData) p.push(nData + " donnée" + (nData>1?"s":"") + " d'entraînement");
-  if(nTech) p.push(nTech + " réglage" + (nTech>1?"s":"") + " ou cache" + (nTech>1?"s":""));
-  return {t: p.join(" et "), pl: (nData + nTech) > 1, f: nData > 0 && nTech === 0};
-}
-/* LA MARQUE « anciennes copies conservees » A ETE SUPPRIMEE avec la seconde
-   question qui la produisait. Elle ne servait qu'a distinguer « ces copies
-   ne sont pas a toi » de « elles sont a toi, mais tu as demande qu'on ne les
-   affiche plus » -- deux sens portes par un meme LEGACY_OWNER a false. Le
-   panneau ne tranche plus cette question : il DECRIT sans revendiquer de
-   proprietaire, ce qui est vrai dans les deux cas. */
 
 /* ---------- pierres tombales -------------------------------------------
    sdel() ne supprime que la copie PREFIXEE. Sans precaution, le repli
@@ -1423,12 +1398,16 @@ async function storageProbe(){
    Il n'y a plus d'evenement de migration, donc plus de resume au premier
    lancement. A la place, un panneau PERMANENT dans l'onglet Zones,
    rejouable a volonte, qui dit pour chaque cle :
-     - D'OU VIENT ce que l'app affiche : « ton profil » ou « ton ancienne
-       copie » ;
-     - le decompte reconnaissable (seances cochees, entrees de journal,
-       courses, version du plan) ;
-     - quand les DEUX copies existent, la comparaison CARACTERE POUR
-       CARACTERE et son verdict.
+     - ce qui est enregistre SOUS LE PROFIL, et son decompte reconnaissable
+       (seances cochees, entrees de journal, courses, version du plan) ;
+     - POUR LE SEUL PROPRIETAIRE PROUVE des anciennes cles (LEGACY_OWNER),
+       d'ou vient ce que l'app affiche (« ton profil » ou « ton ancienne
+       copie ») et, quand les DEUX copies existent, leur comparaison
+       CARACTERE POUR CARACTERE.
+   UN PROFIL QUI N'EST PAS PROPRIETAIRE NE LIT JAMAIS LES ANCIENNES CLES ICI :
+   ni lecture, ni decompte, ni comparaison. Une version precedente les
+   comparait quand meme, et affichait a une invitee « ton ancienne copie
+   figée : 24 cochées » -- les seances d'Enzo.
 
    Ce module ne fait que des LECTURES. Il n'ecrit rien, ne supprime rien,
    n'appelle pas le reseau, et ne rend jamais la valeur d'une cle :
@@ -1477,37 +1456,50 @@ function storedCount(k, str){
   return "présent";
 }
 
-/* Etat d'une cle DU POINT DE VUE D'ENZO : d'ou vient ce qu'il voit.
-   Reproduit exactement la decision de sget(), sans rien modifier :
-     fail-new    : copie du profil ILLISIBLE -> aucun repli, saisie refusee
+/* Etat d'une cle. Reproduit la decision de sget(), sans rien modifier.
+   PROFIL NON PROPRIETAIRE (LEGACY_OWNER faux) -- l'ancienne copie n'est
+   PAS LUE, et c'est le point :
+     fail-new    : copie du profil ILLISIBLE
+     new         : copie du profil presente
+     none-own    : rien sous le profil
+   PROPRIETAIRE PROUVE (LEGACY_OWNER vrai) :
+     fail-new    : copie du profil ILLISIBLE -> aucun repli
      same / diff : les deux copies existent -> c'est le profil qui est affiche
      new-only    : copie du profil seule
      new-oldfail : copie du profil affichee, ancienne illisible
      removed     : retiree volontairement (pierre tombale) -> pas de repli
      old         : repli en cours, c'est l'ancienne copie qui est affichee
-     unowned     : une copie SANS PROFIL existe, et le repli est ferme
-                   (LEGACY_OWNER faux) -> l'app ne l'affiche pas.
-                   ON NE DIT PAS A QUI ELLE EST, ni dans un sens ni dans
-                   l'autre : LEGACY_OWNER a false recouvre DEUX situations
-                   -- « ces copies ne sont pas a toi » (profil arrive par
-                   invitation) et « elles sont a toi, mais tu as demande la
-                   suppression, donc l'app ne les lit plus ». Les confondre
-                   faisait affirmer a Enzo, apres sa propre suppression, que
-                   ses copies n'etaient pas les siennes. Le panneau decrit,
-                   il ne revendique pas.
      fail-old    : rien sous le profil, et ancienne copie illisible
-     none        : absente des deux cotes */
+     none        : absente des deux cotes
+   LEGACY_OWNER est lu UNE fois, au debut : c'est la valeur que sget() suit
+   pendant cette session. */
 async function verifyProfileData(){
   const out = [];
+  const owner = LEGACY_OWNER === true;
   for(let i = 0; i < STORED_KEYS.length; i++){
     const k = STORED_KEYS[i];
     const b = await rawGet(profileKey(k));     // ce que l'app lit en premier
+    const bVideNp = (b.state === "ok" && b.value === "null");
+    if(!owner){
+      /* NON PROPRIETAIRE : aucune lecture de l'ancienne copie, donc ni
+         decompte ni comparaison possibles -- par construction. Une cle
+         prefixee valant "null" est une cle videe (cf. plus bas). */
+      const plein = (b.state === "ok" && !bVideNp);
+      out.push({
+        key: k,
+        state: (b.state === "fail") ? "fail-new" : (plein ? "new" : "none-own"),
+        oldLen: 0, oldCount: "",
+        newLen: plein ? b.value.length : 0,
+        newCount: plein ? storedCount(k, b.value) : ""
+      });
+      continue;
+    }
     const a = await rawGet(k);                 // l'ancienne copie, gelee
     const tomb = await tombHas(k);
     /* MEME REGLE QUE sget() : une cle prefixee dont la valeur vaut exactement
        "null" est une cle VIDEE PAR SUBSTITUTION, donc une ABSENCE, pas un
        contenu. Un backend sans delete() ni remove() ne sait pas retirer une
-       cle : rawDelDetailed() ecrase alors sa valeur. Sans cette regle, le
+       cle : rawDel() ecrase alors sa valeur. Sans cette regle, le
        panneau contredisait mot pour mot le compte rendu de suppression qui
        venait d'etre lu -- « le stockage ne sait pas retirer une cle : son
        contenu a ete ecrase » d'un cote, « l'app affiche 3 donnees depuis ton
@@ -1524,11 +1516,7 @@ async function verifyProfileData(){
       else                        state = "new-only";
     }
     else if(tomb)                 state = "removed";
-    /* LEGACY_OWNER commande le repli dans sget() : le dire ici aussi, sinon
-       le panneau annonce « ton ancienne copie » pour une donnee que l'app
-       n'affiche pas -- et, apres une suppression sur l'appareil, il ferait
-       croire que ce qui vient d'etre efface est toujours affiche. */
-    else if(a.state === "ok")     state = LEGACY_OWNER ? "old" : "unowned";
+    else if(a.state === "ok")     state = "old";   // proprietaire : sget() se replie ici
     else if(a.state === "fail")   state = "fail-old";
     else                          state = "none";
     out.push({
@@ -1568,16 +1556,14 @@ function renderProfileNote(){
   const qui = PROFILE_NAME ? (PROFILE_NAME + " (« " + PROFILE_ID + " »)") : ("« " + PROFILE_ID + " »");
   /* Le repli sur les anciennes clés n'est ouvert qu'au profil qui en est
      propriétaire : le promettre à un profil arrivé par invitation serait
-     faux, et laisserait croire que des données vont réapparaître.
-     REPLI FERMÉ : on ne revendique AUCUNE propriété, ni dans un sens ni dans
-     l'autre. LEGACY_OWNER à false veut dire deux choses très différentes —
-     « ces copies ne sont pas les tiennes » (arrivé par invitation) et
-     « elles sont les tiennes, mais tu as demandé la suppression » — et l'app
-     ne sait pas laquelle. La phrase ci-dessous est vraie dans les deux cas. */
+     faux. REPLI FERMÉ : la phrase est CONDITIONNELLE — elle ne dit ni qu'il
+     existe des copies sans profil, ni à qui elles sont. Elle est vraie
+     qu'il y en ait ou non. */
   el.textContent = "Profil " + qui + ". Tes données s'enregistrent sous des clés préfixées par ton profil. "
     + (LEGACY_OWNER
       ? "Tant qu'une donnée n'a pas été réécrite, l'app continue de lire ton ancienne copie : rien n'est déplacé d'avance. "
-        + "Tes anciennes clés ne sont jamais modifiées ni supprimées."
+        + "Tes anciennes clés ne sont jamais modifiées ni supprimées. "
+        + "Quand les deux copies existent, la vérification les compare caractère par caractère."
       : "Si des copies sans profil se trouvent sur cet appareil, l'app ne les affiche pas, "
         + "ne les modifie pas et ne les supprime pas.");
 }
@@ -1622,6 +1608,12 @@ let STRAVA_ACTS = null;      // {at, connected, days, count, truncated, partial,
 let stravaSyncing = false;   // verrou : JAMAIS deux appels `activities` en parallele
 let stravaAutoTried = false; // la synchro d'ouverture n'a lieu qu'une fois par session
 let STRAVA_SYNC_ERR = "";    // dernier message de synchro en echec (carte Zones)
+/* GENERATION DU STOCKAGE DE CE PROFIL SUR L'APPAREIL. Incrementee par « Supprimer
+   mes données » (au debut ET a la fin). Toute operation reseau lancee AVANT
+   relit ce compteur au retour : s'il a change, elle n'ecrit plus rien et ne
+   touche plus a l'etat affiche. Sans lui, une synchro Strava partie avant la
+   suppression reecrivait `<profil>:tgcm-strava-cache` juste apres. */
+let WIPE_GEN = 0;
 const $ = id => document.getElementById(id);
 const TYPE_LABEL = {off:"Repos", easy:"Endurance", qual:"Qualité", renfo:"Renfo", long:"Sortie longue", race:"Course"};
 const FEELS = [["good","👍 Bien"],["ok","😐 Bof"],["hard","🥵 Dur"]];
@@ -1656,6 +1648,26 @@ let PLAN_SOURCE = "";    // "default" | "override"
 let PLAN_CACHED = false; // servi depuis le cache hors-ligne
 let PLAN_PENDING_OVERRIDE = null; // override conserve mais ignore (version < plan.json)
 let pendingPlan = null;  // plan valide, en attente de confirmation
+/* DERNIER PLAN PAR DEFAUT VALIDE vu dans cette session : {plan, cached}.
+   EN MEMOIRE SEULEMENT, jamais ecrit. C'est le contenu de plan.json -- le meme
+   pour tout le monde, aucune donnee de personne --, et il sert a une seule
+   chose : re-resoudre le plan APRES « Supprimer mes données » sans appel
+   reseau (cf. replanFromStorage), alors que `<profil>:plan-cache` vient
+   d'etre efface. */
+let PLAN_DEFAULT = null;
+/* Plan par defaut servi depuis le cache hors-ligne, mais dont la copie
+   enregistree vient d'etre effacee par « Supprimer mes données » : il ne vit
+   plus qu'en memoire. La provenance le dit, au lieu d'annoncer un cache qui
+   n'existe plus (P3). Remis a false par applyPlan et failToPlanError. */
+let PLAN_MEMORY_ONLY = false;
+/* Nombre de chargements du plan (reloadPlan) en cours. Apres une suppression,
+   « aucun plan » n'est pas une erreur tant que plan.json est encore en route :
+   on affiche « Chargement du plan… » (P4). Borne par le delai de fetchPlanJSON :
+   l'ecran ne peut pas rester fige. */
+let PLAN_LOADING = 0;
+/* Texte de la ligne de version quand aucun plan n'est actif. Vide = texte
+   par defaut (« Plan indisponible — vérifie ta connexion. »). */
+let PLAN_NONE_TEXT = "";
 
 function isPlainObject(v){ return !!v && typeof v==="object" && !Array.isArray(v); }
 function isISODate(s){
@@ -1824,6 +1836,9 @@ function applyPlan(plan, source, cached){
   PLAN = plan;
   PLAN_SOURCE = source || "default";
   PLAN_CACHED = !!cached;
+  PLAN_MEMORY_ONLY = false;
+  // Plan par defaut installe : c'est aussi le repli de replanFromStorage.
+  if(PLAN_SOURCE === "default" && plan) PLAN_DEFAULT = {plan:plan, cached:!!cached};
   WEEKS = arr(plan && plan.weeks);
   ZONES = arr(plan && plan.zones);
   SEED_RACES = arr(plan && plan.races);
@@ -1833,11 +1848,12 @@ function applyPlan(plan, source, cached){
 }
 function planProvenance(){
   if(PLAN_SOURCE==="override") return "plan importé";
+  if(PLAN_CACHED && PLAN_MEMORY_ONLY) return "plan par défaut (hors-ligne, en mémoire seulement)";
   return PLAN_CACHED ? "plan par défaut (cache hors-ligne)" : "plan par défaut";
 }
 function renderVersionLine(){
   const el = $("versionline"); if(!el) return;
-  if(!PLAN){ el.textContent = "Plan indisponible — vérifie ta connexion."; return; }
+  if(!PLAN){ el.textContent = PLAN_NONE_TEXT || "Plan indisponible — vérifie ta connexion."; return; }
   const s = planStats(PLAN);
   el.textContent = "Plan v"+PLAN.version+" · "+(s.updated ? "mis à jour le "+frNum(s.updated) : "date inconnue")
     + " · " + planProvenance() + " · " + s.weeks + " semaines ("+frNum(s.start)+" → "+frNum(s.end)+")";
@@ -1907,9 +1923,25 @@ function safeValid(o){
             summary:{version:null, updated:"", weeks:0, days:0, start:"", end:""}};
   }
 }
+/* Choix du plan a partir de sources DEJA obtenues. SEULE implementation de
+   l'ordre de priorite, partagee par le demarrage (resolvePlan) et par la
+   re-resolution apres suppression (replanFromStorage) : les deux chemins ne
+   peuvent pas diverger. Rend null s'il n'y a aucun plan. */
+function pickPlan(override, def, cached){
+  if(override && def){
+    if(override.version >= def.version) return {plan:override, source:"override"};
+    return {plan:def, source:"default",
+            pendingOverride:{override:override.version, def:def.version}};
+  }
+  if(override) return {plan:override, source:"override"};
+  if(def) return {plan:def, source:"default"};
+  if(cached) return {plan:cached, source:"default", cached:true};
+  return null;
+}
 /* Ordre : override (si version >= plan.json) > plan.json > cache hors-ligne.
    Ne LEVE JAMAIS : renvoie toujours un objet resultat. */
 async function resolvePlan(){
+  const gen = WIPE_GEN;   // cf. WIPE_GEN : pas de reecriture du cache apres une suppression
   try{
     let override = null;
     try{ override = await sget("plan-override", null); }catch(e){}
@@ -1923,40 +1955,110 @@ async function resolvePlan(){
         : ((e && e.message) ? e.message : "réseau indisponible");
     }
     if(def){
-      if(safeValid(def).ok){ try{ await sset("plan-cache", def); }catch(e){} }
+      if(safeValid(def).ok){
+        PLAN_DEFAULT = {plan:def, cached:false};   // memoire seulement, cf. PLAN_DEFAULT
+        if(gen === WIPE_GEN){ try{ await sset("plan-cache", def); }catch(e){} }
+      }
       else { def = null; err = "plan.json trouvé mais invalide"; }
     }
 
-    if(override && def){
-      if(override.version >= def.version) return {plan:override, source:"override"};
-      return {plan:def, source:"default",
-              pendingOverride:{override:override.version, def:def.version}};
-    }
-    if(override) return {plan:override, source:"override"};
-    if(def) return {plan:def, source:"default"};
-
     let cached = null;
-    try{ cached = await sget("plan-cache", null); }catch(e){}
-    if(cached && safeValid(cached).ok) return {plan:cached, source:"default", cached:true};
-    return {plan:null, source:"", error:err};
+    if(!override && !def){
+      try{ cached = await sget("plan-cache", null); }catch(e){}
+      if(cached && !safeValid(cached).ok) cached = null;
+    }
+    const r = pickPlan(override, def, cached);
+    return r || {plan:null, source:"", error:err};
   }catch(e){
     return {plan:null, source:"", error:((e && e.message) || String(e))};
   }
 }
-function showPlanError(detail){
+/* RE-RESOLUTION DU PLAN APRES « Supprimer mes données » (defaut m-a).
+   Le plan en memoire DOIT refleter le stockage : sans cela, un plan importe
+   efface restait actif, l'ecran disait « plan importé » et un export juste
+   apres le contenait -- une donnee supprimee ressortait dans un fichier.
+   MEME CHOIX qu'au demarrage (pickPlan), sur des sources RELUES :
+     - le plan importe et le cache : relus dans le STOCKAGE (sget, repli
+       compris -- exactement ce qu'un redemarrage lirait) ;
+     - le plan par defaut : PLAN_DEFAULT, le plan.json deja vu dans cette
+       session. AUCUN APPEL RESEAU, et AUCUNE ECRITURE (ni cache, ni rien).
+   Aucun plan nulle part (appli ouverte hors-ligne avec un plan importe, que
+   la suppression vient d'effacer) : ecran « Plan indisponible », avec son
+   bouton Réessayer, et UN SEUL message, vrai dans tous les cas (P2) : aucun
+   plan n'est enregistre, il en faut un par le reseau ou par un import.
+   SAUF si plan.json est encore en route (PLAN_LOADING, P4) : ce n'est pas
+   une erreur, l'app affiche « Chargement du plan… » et reloadPlan re-resout
+   a son retour.
+   Ne LEVE JAMAIS, n'affiche AUCUN message. Rend true si un plan est actif. */
+const PLAN_NONE_WIPED = "Aucun plan n'est enregistré sur cet appareil. Touche « Réessayer » pour charger le plan par défaut (une connexion est nécessaire).";
+async function replanFromStorage(){
+  try{
+    let override = null;
+    try{ override = await sget("plan-override", null); }catch(e){ override = null; }
+    if(override && !safeValid(override).ok) override = null;
+    const def = (PLAN_DEFAULT && PLAN_DEFAULT.plan) ? PLAN_DEFAULT.plan : null;
+    let cached = null;
+    try{ cached = await sget("plan-cache", null); }catch(e){ cached = null; }
+    if(cached && !safeValid(cached).ok) cached = null;
+    const r = pickPlan(override, def, cached);
+    if(!r || !r.plan){
+      if(PLAN_LOADING > 0) planLoadingState();
+      else failToPlanError("", PLAN_NONE_WIPED);
+      return false;
+    }
+    // Plan par defaut tire de PLAN_DEFAULT : il garde sa provenance d'origine
+    // (plan.json frais, ou cache hors-ligne lu avant la suppression).
+    let servi = !!r.cached;
+    if(r.source === "default" && !r.cached && PLAN_DEFAULT && r.plan === PLAN_DEFAULT.plan) servi = !!PLAN_DEFAULT.cached;
+    applyPlan(r.plan, r.source, servi);
+    /* Servi depuis le cache hors-ligne, mais ce cache vient d'etre efface
+       (relu absent juste au-dessus) : le plan ne vit plus qu'en memoire (P3). */
+    if(servi && !cached) PLAN_MEMORY_ONLY = true;
+    PLAN_PENDING_OVERRIDE = r.pendingOverride || null;
+    return true;
+  }catch(e){
+    try{ failToPlanError("plan illisible — "+((e && e.message) || String(e))); }catch(_){}
+    return false;
+  }
+}
+/* `text` (optionnel) REMPLACE le message par defaut et le detail technique :
+   un seul message, pour les cas ou le message par defaut serait faux (P2). */
+function showPlanError(detail, text){
   $("days").innerHTML =
     '<div class="card care"><h3>⚠ Plan indisponible</h3>'
-    + '<p class="note" style="margin-top:0">Plan indisponible — vérifie ta connexion. Aucun plan n\'est encore enregistré sur cet appareil.</p>'
-    + (detail ? '<p class="note">Détail technique : '+esc(String(detail))+'</p>' : '')
+    + (text
+      ? '<p class="note" style="margin-top:0">'+esc(String(text))+'</p>'
+      : '<p class="note" style="margin-top:0">Plan indisponible — vérifie ta connexion. Aucun plan n\'est encore enregistré sur cet appareil.</p>'
+        + (detail ? '<p class="note">Détail technique : '+esc(String(detail))+'</p>' : ''))
     + '<p class="note">Tu peux aussi coller un JSON de plan dans l\'onglet <b>Zones</b> › « Mettre à jour le plan ».</p>'
     + '<div class="frow" style="margin-top:10px"><button class="btn primary" type="button" id="planretry">Réessayer</button></div></div>';
   $("wktitle").textContent = "—";
   $("wkmeta").textContent = "Aucun plan chargé";
   $("loadsvg").innerHTML = "";
   $("prevwk").disabled = true; $("nextwk").disabled = true;
-  $("todaycard").innerHTML = '<div class="today-card restday"><span class="tc-ico">🌙</span><div class="tc-main"><div class="tc-title">Plan indisponible</div><div class="tc-sub">Vérifie ta connexion, puis réessaie</div></div></div>';
+  $("todaycard").innerHTML = '<div class="today-card restday"><span class="tc-ico">🌙</span><div class="tc-main"><div class="tc-title">Plan indisponible</div><div class="tc-sub">'
+    + (text ? 'Aucun plan enregistré sur cet appareil' : 'Vérifie ta connexion, puis réessaie') + '</div></div></div>';
   const b = $("planretry");
   if(b) b.addEventListener("click", function(){ reloadPlan(true); });
+}
+/* AUCUN PLAN, MAIS plan.json EST ENCORE EN ROUTE (P4). Meme remise a zero que
+   failToPlanError -- surtout pas de plan efface qui resterait actif --, mais
+   pas d'ecran d'erreur : reloadPlan re-resout a son retour, et le delai de
+   fetchPlanJSON borne l'attente. Ne doit jamais lever. */
+function planLoadingState(){
+  PLAN = null; PLAN_SOURCE = ""; PLAN_CACHED = false; PLAN_MEMORY_ONLY = false; PLAN_PENDING_OVERRIDE = null;
+  PLAN_NONE_TEXT = "Chargement du plan…";
+  WEEKS = []; ZONES = []; SEED_RACES = []; RACE_DAY = "";
+  try{ applyRaceMeta(); }catch(e){}
+  try{ renderAll(); }catch(e){}
+  try{
+    $("days").innerHTML = '<div class="card"><p class="note" style="margin-top:0">Chargement du plan…</p></div>';
+    $("wktitle").textContent = "—";
+    $("wkmeta").textContent = "Chargement du plan…";
+    $("loadsvg").innerHTML = "";
+    $("prevwk").disabled = true; $("nextwk").disabled = true;
+    $("todaycard").innerHTML = '<div class="today-card restday"><span class="tc-ico">⏳</span><div class="tc-main"><div class="tc-title">Chargement du plan…</div></div></div>';
+  }catch(e){}
 }
 function renderAll(){
   renderZones(); renderRaces(); renderJournal(); renderProgress();
@@ -1975,21 +2077,40 @@ function renderAll(){
   renderWeek(); renderToday();
 }
 /* Remet l'app dans un etat vide + ecran d'erreur. Ne doit jamais lever. */
-function failToPlanError(detail){
-  PLAN = null; PLAN_SOURCE = ""; PLAN_CACHED = false; PLAN_PENDING_OVERRIDE = null;
+function failToPlanError(detail, text){
+  PLAN = null; PLAN_SOURCE = ""; PLAN_CACHED = false; PLAN_MEMORY_ONLY = false; PLAN_PENDING_OVERRIDE = null;
+  PLAN_NONE_TEXT = text ? String(text) : "";
   WEEKS = []; ZONES = []; SEED_RACES = []; RACE_DAY = "";
   try{ applyRaceMeta(); }catch(e){}
   try{ renderAll(); }catch(e){}
-  try{ showPlanError(detail); }catch(e){
+  try{ showPlanError(detail, text); }catch(e){
     try{ $("days").textContent = "Plan indisponible — vérifie ta connexion."; }catch(_){}
   }
 }
 /* REGLE ABSOLUE : quoi qu'il arrive, on ne reste jamais sur « Chargement du plan… ».
    Le pire cas possible est l'ecran d'erreur avec bouton Réessayer. */
 async function reloadPlan(notify){
+  const gen = WIPE_GEN;
   let r;
+  /* PLAN_LOADING est decremente AVANT toute re-resolution ci-dessous :
+     sinon replanFromStorage conclurait « encore en route » et l'ecran
+     resterait sur « Chargement du plan… ». */
+  PLAN_LOADING++;
   try{ r = await resolvePlan(); }
   catch(e){ r = {plan:null, source:"", error:((e && e.message) || String(e))}; }
+  finally{ PLAN_LOADING = Math.max(0, PLAN_LOADING - 1); }
+  /* SUPPRESSION PENDANT LE CHARGEMENT (plan.json lent au demarrage, ou
+     « Réessayer »). Ce resultat a ete calcule en partie sur le stockage
+     d'AVANT : le plan importe a pu etre lu juste avant d'etre efface. On le
+     JETTE et on re-resout depuis le stockage d'apres -- plan.json, lui, vient
+     d'arriver et reste utilisable (PLAN_DEFAULT). Aucune ecriture, et aucun
+     message : il masquerait le compte rendu de suppression. */
+  if(gen !== WIPE_GEN){
+    let ok = false;
+    try{ ok = await replanFromStorage(); }catch(e){ ok = false; }
+    try{ renderAll(); }catch(e){}
+    return ok;
+  }
 
   if(!r || !r.plan){
     failToPlanError(r && r.error);
@@ -2383,6 +2504,13 @@ $("planreset").addEventListener("click", async function(){
   });
   if(!go) return;
   hidePlanConfirm();
+  /* OPERATION EN VOL (defaut m-b). Une suppression des donnees de l'appareil
+     peut survenir pendant le telechargement de plan.json : a son retour, on
+     n'ecrit plus rien (ni `plan-cache`, ni la pierre tombale de sdel) et on
+     n'affiche aucun message -- « Plan par défaut rétabli » par-dessus « Tes
+     données ont été supprimées » ecrivait sous le prefixe apres le compte
+     rendu. Le plan affiche est deja celui du stockage (replanFromStorage). */
+  const gen = WIPE_GEN;
   // B4 : on recharge d'ABORD, on ne supprime l'override QUE si plan.json est joignable.
   let def = null, why = "";
   try{ def = await fetchPlanJSON(); }
@@ -2391,6 +2519,7 @@ $("planreset").addEventListener("click", async function(){
       ? "plan.json n'a pas répondu en "+(PLAN_FETCH_TIMEOUT/1000)+" s"
       : ((e && e.message) ? e.message : "réseau indisponible");
   }
+  if(gen !== WIPE_GEN) return;
   if(def && !safeValid(def).ok){ def = null; why = "plan.json trouvé mais invalide"; }
   if(!def){
     planMsg("Retour au plan par défaut impossible : "+why+".\n"
@@ -2455,7 +2584,13 @@ $("savealert-export").addEventListener("click", function(){
 function verifyDetail(r){
   const prof = r.newCount + " (" + r.newLen + " car.)";
   const anc  = r.oldCount + " (" + r.oldLen + " car.)";
-  if(r.state === "fail-new")    return "illisible sous ton profil — l'app n'affiche rien ici et refuse la saisie";
+  /* « refuse la saisie » a ete retire : cette lecture-ci peut echouer sans
+     que la saisie soit refusee (le refus depend de la lecture faite au
+     demarrage). Le bandeau d'alerte, lui, dit quand la saisie est refusee. */
+  if(r.state === "fail-new")    return "illisible sous ton profil sur cet appareil";
+  // Profil non proprietaire : seules ces deux formes existent, sans ancienne copie.
+  if(r.state === "new")         return "ton profil · " + prof;
+  if(r.state === "none-own")    return "rien sous ton profil";
   if(r.state === "fail-old")    return "rien sous ton profil, et ton ancienne copie est illisible sur cet appareil";
   if(r.state === "same")        return "ton profil · " + prof + " · identique à ton ancienne copie, caractère pour caractère";
   if(r.state === "diff")        return "ton profil · " + prof + " · différent de ton ancienne copie figée : " + anc
@@ -2463,9 +2598,6 @@ function verifyDetail(r){
   if(r.state === "new-only")    return "ton profil · " + prof + " · pas d'ancienne copie";
   if(r.state === "new-oldfail") return "ton profil · " + prof + " · ancienne copie illisible sur cet appareil";
   if(r.state === "old")         return "ton ancienne copie · " + anc + " · rien n'est encore écrit sous ton profil";
-  /* NEUTRE, ET C'EST LE POINT : on ne dit pas à qui est cette copie. L'app
-     sait seulement qu'elle ne la lit pas. */
-  if(r.state === "unowned")     return "rien sous ton profil · une copie sans profil existe sur cet appareil : l'app ne l'affiche pas, ne la modifie pas et ne la supprime pas";
   if(r.state === "removed")     return "retirée volontairement · l'app n'affiche rien ici"
                                        + (r.oldCount ? " · ancienne copie conservée : " + anc : "");
   return "absente des deux côtés";
@@ -2487,32 +2619,26 @@ async function runVerify(){
     msg.textContent = "Vérification impossible : le stockage de cet appareil n'a pas répondu. Tes données ne sont pas modifiées pour autant.";
     return;
   }
-  let same = 0, diff = 0, fail = 0, viaProfil = 0, viaAncienne = 0, sansProfil = 0;
-  /* CE QU'UNE PERSONNE APPELLE « SES DONNEES » : exactement la meme liste que
-     le compte rendu de suppression (WIPE_DATA_KEYS). Sans elle, le panneau
-     annoncait « L'app affiche 1 donnée depuis ton profil » a un profil invite
-     qui n'a rien -- ce « 1 » etant `<profil>:plan-cache`, reecrit a CHAQUE
-     demarrage en ligne --, pendant que le compte rendu de suppression disait,
-     a la meme seconde, « Aucune donnée n'était enregistrée sous ton profil ».
-     Deux phrases contradictoires sur le meme etat. Elles comptent desormais
-     la meme chose. `viaProfil` / `viaAncienne` restent les totaux AFFICHES,
-     caches compris : ils choisissent la branche, ils ne se disent pas. */
-  /* `sameData` : meme filtre, pour la meme raison. `same` comptait tout, si
-     bien qu'un profil dont SEUL `tgcm-strava-cache` etait identique lisait
-     « Aucune donnée d'entraînement n'est enregistrée sous ton profil … 1
-     comparée caractère pour caractère … : identique » -- une absence et un
-     decompte dans la meme phrase. `same` reste le total brut : il ne se dit
-     pas. */
-  let dataProfil = 0, dataAncienne = 0, techProfil = 0, sameData = 0;
+  /* RESUME : MOINS D'AFFIRMATIONS, TOUTES VRAIES. Il ne parle que de ce qui
+     est enregistre SOUS LE PROFIL -- et, pour le seul proprietaire prouve des
+     anciennes cles, de ce que l'app lit depuis son ancienne copie. Il ne dit
+     jamais qu'il existe des copies sans profil, ni combien, ni a qui : un
+     profil non proprietaire ne les a d'ailleurs meme pas lues.
+     « Donnée d'entraînement » = WIPE_DATA_KEYS (seances, journal, courses,
+     plan importe) : les reglages et caches ne s'y comptent pas, sans quoi
+     `<profil>:plan-cache`, reecrit a chaque demarrage en ligne, faisait
+     annoncer « 1 donnée » a un profil qui n'a rien. */
+  let fail = 0, failData = 0, dataProfil = 0, dataAncienne = 0, sameData = 0;
   for(let i = 0; i < rows.length; i++){
     const r = rows[i];
     const estDonnee = WIPE_DATA_KEYS.indexOf(r.key) >= 0;
-    if(r.state === "same"){ same++; viaProfil++; if(estDonnee){ dataProfil++; sameData++; } else techProfil++; }
-    else if(r.state === "diff"){ diff++; viaProfil++; if(estDonnee) dataProfil++; else techProfil++; }
-    else if(r.state === "new-only" || r.state === "new-oldfail"){ viaProfil++; if(estDonnee) dataProfil++; else techProfil++; }
-    else if(r.state === "old"){ viaAncienne++; if(estDonnee) dataAncienne++; }
-    else if(r.state === "unowned") sansProfil++;
-    else if(r.state === "fail-new" || r.state === "fail-old") fail++;
+    if(r.state === "fail-new" || r.state === "fail-old"){ fail++; if(estDonnee) failData++; }
+    else if(r.state === "same" || r.state === "diff" || r.state === "new-only"
+            || r.state === "new-oldfail" || r.state === "new"){
+      if(estDonnee) dataProfil++;
+      if(estDonnee && r.state === "same") sameData++;
+    }
+    else if(r.state === "old" && estDonnee) dataAncienne++;
     // L'orange ne signale QUE ce qui n'a pas pu etre lu. Une difference est
     // un etat normal : elle reste en gris, sans emphase.
     const cls = (r.state === "same") ? "same" : ((r.state === "fail-new" || r.state === "fail-old") ? "diff" : "");
@@ -2521,46 +2647,38 @@ async function runVerify(){
   let heure = "";
   try{ heure = new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"}); }catch(e){}
   const quand = heure ? (" Vérifié à " + heure + ".") : "";
-  const provenance = (dataProfil || dataAncienne)
-    ? ("L'app affiche " + dataProfil + " donnée" + (dataProfil>1?"s":"") + " depuis ton profil et "
-       + dataAncienne + " depuis ton ancienne copie.")
-    : ("Aucune donnée d'entraînement n'est enregistrée sous ton profil sur cet appareil"
-       + (techProfil ? " : seuls des réglages ou des caches y figurent, et ils se reconstruisent tout seuls." : "."));
-  /* CE QUI EST SUR L'APPAREIL SANS ETRE AFFICHE. Cette phrase ne peut pas
-     dependre de `viaProfil` : `<profil>:plan-cache` est reecrit a CHAQUE
-     demarrage en ligne, donc viaProfil vaut presque toujours au moins 1 et
-     l'etat « copies d'un autre » n'etait quasiment jamais annonce. Pire, le
-     resume disait « Tes anciennes clés sont conservées telles quelles » a
-     un profil invite, en designant le journal de gênes de quelqu'un d'autre.
-     NEUTRALITE : on compte ces copies, on ne dit pas A QUI elles sont. Le
-     repli ferme (LEGACY_OWNER faux) recouvre « pas les tiennes » ET « les
-     tiennes, mais tu as demande la suppression » : le panneau ne sait pas
-     laquelle, et affirmer l'une des deux mentait dans l'autre cas. */
-  let aussi = "";
-  // « ne est » au singulier : l'elision se fait ici, pas par accord.
-  if(sansProfil) aussi += " " + sansProfil + " copie" + (sansProfil>1?"s":"") + " sans profil "
-    + (sansProfil>1?"sont présentes":"est présente") + " sur cet appareil : l'app ne "
-    + (sansProfil>1?"les ":"l'") + "affiche pas, ne " + (sansProfil>1?"les ":"la ")
-    + "modifie pas et ne " + (sansProfil>1?"les ":"la ") + "supprime pas.";
+  /* UNE DONNEE D'ENTRAINEMENT ILLISIBLE : le decompte serait incomplet, on ne
+     le donne pas. En revanche, si seuls une cle d'appareil ou un cache n'ont
+     pas pu etre lus, le decompte des donnees d'entrainement reste EXACT (elles
+     ont toutes ete lues) : on le garde, et on signale l'element illisible a
+     cote -- le taire faisait disparaitre le resume pour un simple cache. */
+  if(fail && !failData){
+    let t0 = dataProfil
+      ? ("Sous ton profil : " + dataProfil + " donnée" + (dataProfil>1?"s":"") + " d'entraînement.")
+      : "Aucune donnée d'entraînement n'est enregistrée sous ton profil sur cet appareil.";
+    if(dataAncienne) t0 += " Depuis ton ancienne copie : " + dataAncienne + " donnée" + (dataAncienne>1?"s":"") + " d'entraînement.";
+    msg.className = "note diffmsg";
+    msg.textContent = t0 + " En revanche, " + fail + " autre élément" + (fail>1?"s":"")
+      + " (clé d'appareil ou cache, en orange ci-dessus) " + (fail>1?"n'ont pas pu être lus":"n'a pas pu être lu")
+      + " sur cet appareil. Cette vérification n'a rien modifié." + quand;
+    return;
+  }
   if(fail){
     msg.className = "note diffmsg";
     // Accord au pluriel : « 2 données n'ont pas pu être lues ».
     msg.textContent = fail + " donnée" + (fail>1?"s":"") + (fail>1?" n'ont pas pu être lues":" n'a pas pu être lue")
-      + " sur cet appareil. Rien n'est modifié, et la saisie correspondante est refusée." + aussi + quand;
-  } else if(sameData){
-    msg.className = "note okmsg";
-    msg.textContent = provenance + " " + sameData + " comparée" + (sameData>1?"s":"") + " caractère pour caractère avec l'ancienne copie : identique" + (sameData>1?"s":"") + "." + aussi + quand;
-  } else if(viaProfil || viaAncienne){
-    msg.className = "note";
-    /* « Tes anciennes clés » ne se dit qu'a qui elles appartiennent. */
-    msg.textContent = provenance + (LEGACY_OWNER ? " Tes anciennes clés sont conservées telles quelles." : "") + aussi + quand;
-  } else if(sansProfil){
-    msg.className = "note";
-    msg.textContent = "Aucune donnée n'est enregistrée sous ton profil sur cet appareil." + aussi + quand;
-  } else {
-    msg.className = "note";
-    msg.textContent = "Aucune donnée enregistrée sur cet appareil." + quand;
+      + " sur cet appareil. Cette vérification n'a rien modifié." + quand;
+    return;
   }
+  let txt = dataProfil
+    ? ("Sous ton profil : " + dataProfil + " donnée" + (dataProfil>1?"s":"") + " d'entraînement.")
+    : "Aucune donnée d'entraînement n'est enregistrée sous ton profil sur cet appareil.";
+  // dataAncienne et sameData ne peuvent etre non nuls que pour le proprietaire :
+  // les lignes d'un autre profil ne portent jamais ces etats.
+  if(dataAncienne) txt += " Depuis ton ancienne copie : " + dataAncienne + " donnée" + (dataAncienne>1?"s":"") + " d'entraînement.";
+  if(sameData) txt += " " + sameData + " comparée" + (sameData>1?"s":"") + " caractère pour caractère avec l'ancienne copie : identique" + (sameData>1?"s":"") + ".";
+  msg.className = sameData ? "note okmsg" : "note";
+  msg.textContent = txt + quand;
 }
 $("verifydata").addEventListener("click", function(){ runVerify(); });
 /* Le libelle de provenance ne depend d'aucun chargement : il est pose des
@@ -2709,11 +2827,16 @@ function renderStravaCard(){
   el.textContent = stravaText(STRAVA_STATE);
 }
 async function stravaRefresh(){
+  // Meme garde que stravaSync : une reponse arrivee apres une suppression
+  // des donnees de l'appareil n'affiche plus « Connecté » sur une app videe.
+  const gen = WIPE_GEN;
   try{
     const key = await stravaGetKey();
+    if(gen !== WIPE_GEN) return;
     if(!key){ STRAVA_STATE = "nokey"; STRAVA_DIAG = {status:0, code:"", missing:[]}; renderStravaCard(); return; }
     STRAVA_STATE = "checking"; renderStravaCard();
     const r = await stravaCall("auth-status", "GET");
+    if(gen !== WIPE_GEN) return;
     const cls = stravaClassify(r);
     if(cls === "ok"){
       const body = isPlainObject(r.body) ? r.body : null;
@@ -2771,7 +2894,12 @@ try{
 
   $("stravaconnect").addEventListener("click", async function(){
     stravaMsg("", "");
+    /* Meme garde (defaut m-b) : apres une suppression survenue pendant
+       l'appel, on n'ouvre pas la page d'autorisation Strava et on n'affiche
+       rien -- la demande venait d'une app qui n'a plus ces donnees. */
+    const gen = WIPE_GEN;
     const r = await stravaCall("auth-start", "POST");
+    if(gen !== WIPE_GEN) return;
     const cls = stravaClassify(r);
     if(cls !== "ok"){
       // Meme taxonomie que stravaRefresh : un seul vocabulaire d'erreurs.
@@ -2804,7 +2932,13 @@ try{
       danger: true
     });
     if(!go) return;
+    /* OPERATION EN VOL (defaut m-b) : meme garde que stravaSync. Une
+       suppression survenue pendant l'appel : on ne purge plus le cache (sdel
+       ecrirait `<profil>:storage-removed` apres le compte rendu), on ne touche
+       plus a l'etat affiche et on n'affiche aucun message. */
+    const gen = WIPE_GEN;
     const r = await stravaCall("auth-logout", "POST");
+    if(gen !== WIPE_GEN) return;
     const cls = stravaClassify(r);
     if(cls !== "ok"){
       STRAVA_STATE = cls; renderStravaCard();
@@ -3267,19 +3401,26 @@ function stravaActsMsg(r){
 /* CONTRAINTE DURE : jamais deux appels `activities` en parallele. Le serveur
    n'a pas de verrou et deux rafraichissements simultanes peuvent invalider le
    jeton. Toute demande concurrente est IGNOREE (pas mise en file).
-   Ne LEVE JAMAIS : renvoie "ok" | "busy" | "reauth" | "error". */
+   Ne LEVE JAMAIS : renvoie "ok" | "busy" | "reauth" | "error" | "stale".
+   "stale" : une suppression des donnees de l'appareil a eu lieu pendant
+   l'appel. Le resultat est JETE : ni cache ecrit, ni etat modifie, ni
+   message (il masquerait le compte rendu de suppression). */
 async function stravaSync(manual){
   if(stravaSyncing) return "busy";
   stravaSyncing = true;
+  const gen = WIPE_GEN;
   STRAVA_SYNC_ERR = "";
   try{ renderStravaSync(); }catch(e){}
   try{
     let r = await stravaCall("activities?days=" + STRAVA_DAYS, "GET");
+    if(gen !== WIPE_GEN) return "stale";
     // Un reauth sur UN SEUL appel peut n'etre qu'une collision : on CONFIRME
     // par un second appel avant de demander a Enzo de reconnecter Strava.
     if(stravaIsReauth(r)){
       await stravaWait(STRAVA_REAUTH_RETRY_MS);
+      if(gen !== WIPE_GEN) return "stale";
       const r2 = await stravaCall("activities?days=" + STRAVA_DAYS, "GET");
+      if(gen !== WIPE_GEN) return "stale";
       if(stravaIsReauth(r2)){
         STRAVA_SYNC_ERR = "Connexion Strava à renouveler : tape « Connecter Strava » pour réautoriser.";
         return "reauth";
@@ -3303,6 +3444,7 @@ async function stravaSync(manual){
       acts: acts, byDay: stravaIndex(acts)
     };
     await stravaCacheSave();
+    if(gen !== WIPE_GEN) return "stale";
     // Meme serveur, meme verite : ce que `activities` vient de repondre fait foi
     // pour l'etat affiche par la carte Strava. Sans ca, #stravainfo pouvait
     // annoncer « Connecté depuis le ... » pendant que #stravasyncinfo disait
@@ -3345,6 +3487,7 @@ try{
     if(stravaSyncing){ toast("Synchronisation déjà en cours"); return; }
     stravaProbed = true;
     const res = await stravaSync(true);
+    if(res === "stale") return;         // suppression intervenue entre-temps : on se tait
     if(res === "busy") toast("Synchronisation déjà en cours");
     else if(res === "ok") toast(stravaCountText() + " ✓", 4000);
     else toast(STRAVA_SYNC_ERR || "Synchronisation impossible", 6000);
@@ -3586,27 +3729,67 @@ try{
         appareil, le compte cote serveur, et l'autorisation Strava si elle a
         ete accordee -- avec l'endroit exact ou la retirer.
 
-   ETAT DE L'APP APRES COUP, decide et assume : MEME PROFIL, APP VIDE.
+   DEUX COMPTES RENDUS, PAS UN DE PLUS. Arbitrage d'Enzo apres cinq passes
+   de test : chaque affirmation precise (decomptes, provenance, promesse de
+   non-reapparition, « fermeture du repli ») a fini par etre fausse dans une
+   combinaison d'etats. On a donc SUPPRIME LA MACHINE qui les produisait :
+     - SUCCES si, et seulement si, une RELECTURE apres coup PROUVE que toutes
+       les cles prefixees visees ont disparu ET qu'aucune donnee de ce profil
+       n'est plus lisible par un repli (cf. wipeOwnKeys) ;
+     - TOUT LE RESTE : « la suppression n'est pas complète », sans chercher
+       a dire pourquoi.
+   Le message et le toast disent la meme chose.
+
+   AUCUNE ECRITURE DE DONNEE. L'operation ne fait que supprimer puis relire.
+   Une seule nuance, qui n'est pas une donnee : sur un stockage qui ne sait
+   pas retirer une cle (window.storage sans delete() ni remove()), rawDel()
+   ECRASE la valeur par "null" -- c'est techniquement une ecriture, sous le
+   prefixe courant uniquement, et la cle reste presente (d'ou le compte rendu
+   « pas complète » dans ce cas). Aucun iPhone n'est concerne : localStorage
+   sait retirer. La marque
+   `<profil>:legacy-owner` n'est ni effacee ni reecrite (cf. le bloc « LES
+   ANCIENNES CLES NON PREFIXEES ») :
+     - pour un profil NON proprietaire (tous les amis d'Enzo), elle vaut
+       false et le reste : au relancement, aucun repli, donc aucun autre
+       profil ne voit les anciennes donnees et la premiere coche n'ecrit que
+       la sienne. La garder recoupe aussi l'ancre sur un appareil partage
+       (sans elle, l'amorcage concluait « incoherent » et demarrait en
+       lecture seule) ;
+     - l'effacer rouvrirait la question au relancement (rededuction depuis
+       l'ancienne cle d'appareil) : l'issue dependrait de ce qui traine sur
+       l'appareil -- c'est le defaut M1 ;
+     - pour le PROPRIETAIRE (Enzo, seul appareil au monde concerne), le repli
+       reste ouvert : ses anciennes copies, intouchables, restent lisibles,
+       et le compte rendu dit donc -- vrai -- que la suppression n'est pas
+       complete.
+   La liste des retraits `<profil>:storage-removed` (TOMB_KEY) n'est pas
+   effacee non plus (defaut 5) : elle ne contient que des noms de cles, et
+   l'effacer faisait reapparaitre chez Enzo des anciennes copies qu'il avait
+   lui-meme retirees (cf. wipeKnownPrefixed).
+   Gardees, les deux marques sont RELUES : si l'une n'a pas la forme exacte
+   que l'app lui donne, le compte rendu dit « pas complète » (M3, cf.
+   wipeOwnKeys) -- sans rien effacer ni reecrire de plus.
+
+   ETAT DE L'APP APRES COUP : MEME PROFIL, ET LA MEMOIRE RE-AMORCEE DEPUIS LE
+   STOCKAGE, quelle que soit l'issue. Remettre la memoire a zero ne suffisait
+   pas : apres une suppression partielle, le panneau affichait « 1 donnée »
+   et la coche suivante ecrasait les 30 seances encore stockees. On relit
+   donc exactement ce que startApp() lirait (loadUserData). LE PLAN AUSSI :
+   il est re-resolu depuis le stockage (replanFromStorage), avec plan.json
+   deja en memoire pour tout reseau -- un plan importe efface ne reste ni a
+   l'ecran ni dans un export.
    L'ancre `profile-id` n'est PAS effacee. Elle ne contient qu'un
    identifiant, aucune donnee de sante, et la garder donne un redemarrage
-   dont on connait exactement l'issue : profil toujours identifie, app vide,
-   pas d'ecran de premiere connexion, et la possibilite de ressaisir une cle
-   d'appareil pour revenir sans redemander d'invitation. L'effacer ferait
-   dependre le prochain demarrage de ce qu'une suppression partiellement
-   echouee aurait laisse derriere -- exactement la deduction que l'amorcage
-   refuse de faire.
+   dont on connait exactement l'issue : profil toujours identifie, pas
+   d'ecran de premiere connexion, et la possibilite de ressaisir une cle
+   d'appareil pour revenir sans redemander d'invitation.
 
-   RIEN NE RESSUSCITE AU RECHARGEMENT. Les cles prefixees une fois
-   effacees, sget() se replierait sur les anciennes copies si le profil en
-   etait proprietaire -- et l'historique reapparaitrait au lancement suivant.
-   On ecrit donc `<profil>:legacy-owner` a false EN DERNIER : c'est la SEULE
-   ecriture de toute l'operation, et c'est elle qui ferme le repli pour de
-   bon. Les pierres tombales ne pouvaient pas jouer ce role : elles sont
-   interdites sur les cles utilisateur, et pour une bonne raison.
-
-   AUCUNE ECRITURE PARASITE. La memoire de la session est remise a zero dans
-   la foulee : sans cela, la premiere saisie suivante aurait recopie sous le
-   profil ce qui vient d'etre efface.
+   OPERATIONS EN VOL. WIPE_GEN est incremente avant et apres. Toute
+   operation reseau partie avant relit le compteur a son retour et, s'il a
+   change, n'ecrit plus rien et n'affiche aucun message : synchro Strava
+   (stravaSync), « Vérifier » (stravaRefresh), « Connecter Strava »,
+   « Déconnecter », « Plan par défaut », et le chargement du plan
+   (reloadPlan, qui re-resout alors depuis le stockage d'apres).
 
    AUCUN APPEL RESEAU. Cette suppression fonctionne hors-ligne, entierement.
    ====================================================================== */
@@ -3618,7 +3801,9 @@ function wipeMsg(text, cls){
 
 /* Enumere les cles PHYSIQUES portant le prefixe du profil courant.
    `enumerable` false = le stockage ne sait pas s'enumerer (window.storage
-   sans keys()) : ce n'est pas un echec, la liste connue prend le relais.
+   sans keys()) : la liste connue prend le relais pour SUPPRIMER, mais la
+   relecture ne peut plus PROUVER qu'il ne reste rien sous le prefixe -- la
+   suppression n'est alors jamais annoncee complete.
    `failed` true = l'enumeration a LEVE : on ne sait pas ce qu'il y a. */
 async function listOwnPrefixedKeys(){
   const res = {names:[], enumerable:false, failed:false};
@@ -3649,10 +3834,20 @@ async function listOwnPrefixedKeys(){
 /* Cles connues, en SECOURS de l'enumeration : un stockage qui ne sait pas
    lister ne doit pas conduire a une suppression partielle silencieuse.
    Construite a partir des constantes existantes, pour qu'un ajout futur
-   n'oublie pas ce point. */
+   n'oublie pas ce point.
+   LEGACY_OWN_KEY N'Y FIGURE PAS : la marque d'heritage n'est jamais visee
+   par la suppression (cf. l'en-tete de bloc).
+   TOMB_KEY NON PLUS (etape 5, defaut 5), pour la meme raison de fond : c'est
+   une MARQUE TECHNIQUE, pas une donnee. Elle ne contient que des NOMS de
+   cles (liste blanche TOMB_ALLOWED : plan-override, tgcm-strava-cache,
+   tgcm-probe), aucune donnee d'entrainement ni de sante. L'effacer rouvrait
+   le repli du proprietaire sur des copies qu'il avait LUI-MEME retirees :
+   chez Enzo, l'ancien plan importe retire par « Plan par défaut » et
+   l'ancien cache Strava purge par « Déconnecter » reapparaissaient. Pour un
+   ami, elle ne change rien : il ne se replie jamais. */
 function wipeKnownPrefixed(){
   const logical = STORED_KEYS.concat(["tgcm-probe", "profile-name",
-                                      EXPORT_STAMP_KEY, TOMB_KEY, LEGACY_OWN_KEY]);
+                                      EXPORT_STAMP_KEY]);
   const out = [];
   for(let i = 0; i < logical.length; i++){
     const phys = profileKey(logical[i]);
@@ -3660,126 +3855,124 @@ function wipeKnownPrefixed(){
   }
   return out;
 }
-/* Efface les cles PREFIXEES du profil courant.
-   Compte rendu MESURE : chaque cle est relue AVANT et APRES. On ne deduit
-   pas qu'une suppression a eu lieu, on le verifie. */
+/* Efface les cles PREFIXEES du profil courant, puis RELIT. Rend true si, et
+   seulement si, la relecture PROUVE les trois points suivants :
+     1. chaque cle visee est ABSENTE. Une cle videe par substitution (valeur
+        "null", backend sans delete()) est encore la : elle ne compte pas
+        comme supprimee ;
+     2. le stockage, RE-ENUMERE, ne porte plus rien sous le prefixe hormis
+        les DEUX MARQUES TECHNIQUES que la suppression garde exprès : la
+        marque d'heritage et la liste des retraits (TOMB_KEY). Elles ne
+        sont tolerees que si leur VALEUR, relue, a exactement la forme que
+        l'app leur donne : "true" ou "false" pour la marque (rememberLegacyOwner),
+        un tableau JSON de noms admis par tombAllowed() pour la liste
+        (tombAdd). Toute autre valeur -- illisible, "null", objet, nom hors
+        liste, texte quelconque -- peut porter autre chose qu'une marque :
+        false. C'est ce controle, et non le seul NOM de la cle, qui fonde
+        « aucune donnee n'y reste ». Elles ne produisent pas non plus de faux
+        succes par leur effet : la marque ne rend rien lisible a elle seule
+        (le point 3 relit le repli), et la liste des retraits ne peut que
+        FERMER un repli, jamais en ouvrir un.
+        Un stockage qui ne sait pas s'enumerer ne prouve rien : false ;
+     3. aucune donnee de ce profil n'est plus lisible par le repli
+        (legacyStillReadable).
+   Tout le reste rend false, exception comprise. AUCUN DECOMPTE : ils ne
+   servaient qu'aux phrases retirees, et ce sont eux qui finissaient faux. */
 async function wipeOwnKeys(){
-  /* LE MEME FILTRE SUR LES TROIS COMPTEURS. `removedData` filtrait ce qui
-     PART par WIPE_DATA_KEYS, mais `remaining` et `unverified` comptaient
-     tout : un profil dont 3 donnees et 4 reglages resistaient lisait
-     « 7 données de ton profil n'ont pas pu être effacées ». C'est la
-     confusion deja fermee du cote succes ; elle survivait du cote echec.
-     Ce qui PART, ce qui RESTE et ce qui n'a pas pu etre MESURE se comptent
-     desormais pareil, et les totaux bruts restent disponibles pour dire les
-     reglages et les caches a part. */
-  /* `presentTech` et `keyRemoved` NE SONT PAS DES COMPTEURS DE CONFORT.
-     Le compte rendu disait « ta clé d'appareil, tes réglages et les caches
-     ONT ETE EFFACES » en ne regardant QUE ce qui RESTE : zero cible, donc
-     rien qui reste, donc « efface ». Un profil strictement vide lisait donc
-     l'affirmation d'un effacement qui n'a jamais eu lieu -- en vert, sans le
-     moindre avertissement. On mesure desormais ce qui etait PRESENT autant
-     que ce qui est PARTI, et on ne nomme la CLE D'APPAREIL que si la copie
-     PREFIXEE existait et est bien partie : la copie non prefixee, elle,
-     n'est jamais visee (le compte rendu la declarait effacee pendant que le
-     panneau la declarait conservee, deux lignes plus loin). */
-  const res = {targets:0, present:0, presentTech:0, keyPresent:false, keyRemoved:false,
-               removed:0, removedData:0, remaining:0,
-               remainingData:0, unverified:0, unverifiedData:0,
-               substituted:0, enumerated:false, listFailed:false,
-               notEnumerable:false};
-  if(!PROFILE_ID){ res.listFailed = true; return res; }
+  if(!PROFILE_ID) return false;
   const pref = PROFILE_ID + PROFILE_SEP;
+  const mark = profileKey(LEGACY_OWN_KEY);
+  const tomb = profileKey(TOMB_KEY);
+  function garde(n){ return n === mark || n === tomb; }   // marques techniques gardees
+  /* M3 : une marque gardee ne compte comme « sans donnee » que si sa valeur
+     relue a la forme exacte ecrite par l'app (cf. point 2 ci-dessus).
+     LECTURE SEULE : une valeur non conforme n'est ni effacee ni reecrite,
+     elle rend seulement la suppression « pas complete ». */
+  async function gardeConforme(n){
+    let r = {state:"fail", value:""};
+    try{ r = await rawGet(n); }catch(e){ r = {state:"fail", value:""}; }
+    if(r.state === "absent") return true;               // partie depuis l'enumeration : rien ne reste
+    if(r.state !== "ok") return false;
+    if(n === mark) return r.value === "true" || r.value === "false";
+    let v = null;
+    try{ v = JSON.parse(r.value); }catch(e){ return false; }
+    return Array.isArray(v) && v.every(function(x){ return typeof x === "string" && tombAllowed(x); });
+  }
+  const targets = [];
+  function vise(n){
+    // GARDE EXPLICITE, en plus de celle de rawDel : le prefixe courant et
+    // rien d'autre -- et jamais les deux marques techniques.
+    if(typeof n === "string" && n.indexOf(pref) === 0 && !garde(n) && targets.indexOf(n) < 0) targets.push(n);
+  }
   let scan = {names:[], enumerable:false, failed:true};
   try{ scan = await listOwnPrefixedKeys(); }catch(e){ scan = {names:[], enumerable:false, failed:true}; }
-  res.enumerated = scan.enumerable;
-  res.listFailed = scan.failed;
-  /* NI ENUMERABLE, NI EN ECHEC : le stockage ne SAIT PAS lister (window.storage
-     sans keys()). La liste connue prend le relais et couvre tout ce que l'app
-     ecrit -- mais si une cle prefixee inconnue d'elle traine la, personne ne
-     peut le savoir. Ce n'est pas un echec, c'est une limite, et elle doit
-     etre DITE : le commentaire de wipeKnownPrefixed promet qu'un stockage qui
-     ne sait pas lister ne conduit pas a une suppression partielle
-     SILENCIEUSE. Silencieuse est le mot qui compte. */
-  res.notEnumerable = !scan.enumerable && !scan.failed;
-  const targets = scan.names.slice();
-  const known = wipeKnownPrefixed();
-  for(let i = 0; i < known.length; i++) if(targets.indexOf(known[i]) < 0) targets.push(known[i]);
+  scan.names.forEach(vise);
+  wipeKnownPrefixed().forEach(vise);
   for(let i = 0; i < targets.length; i++){
-    const phys = targets[i];
-    // GARDE EXPLICITE, en plus de celle de rawDel : on vise le prefixe
-    // courant, et rien d'autre. rawDel reste le dernier rempart.
-    if(typeof phys !== "string" || phys.indexOf(pref) !== 0) continue;
-    res.targets++;
-    const suf = phys.slice(pref.length);
-    const estDonnee = WIPE_DATA_KEYS.indexOf(suf) >= 0;
-    let before = {state:"fail"};
-    try{ before = await rawGet(phys); }catch(e){ before = {state:"fail"}; }
-    if(before.state === "absent") continue;            // rien a effacer ici
-    if(before.state === "ok"){
-      res.present++;
-      if(!estDonnee) res.presentTech++;
-      // La cle d'appareil PREFIXEE, et elle seule : la copie non prefixee
-      // n'est ni lue ici, ni visee, ni effacee.
-      if(suf === "strava-key") res.keyPresent = true;
-    }
-    let del = {ok:false, substituted:false};
-    try{ del = await rawDelDetailed(phys); }catch(e){ del = {ok:false, substituted:false}; }
-    let after = {state:"fail"};
-    try{ after = await rawGet(phys); }catch(e){ after = {state:"fail"}; }
-    let parti = false;
-    if(after.state === "absent"){ res.removed++; parti = true; }
-    else if(after.state === "ok"){
-      /* CLE VIDEE, PAS CLE SURVIVANTE. Un backend sans delete() ni remove()
-         ecrase la valeur par "null" : la cle est encore la, la donnee n'y
-         est plus, et sget() la lit desormais comme une absence. La compter
-         comme « n'a pas pu être effacée » faisait annoncer une suppression
-         INCOMPLETE avec « Supprimé : 0 donnée » alors que tout etait parti. */
-      if(del.substituted && after.value === "null"){ res.removed++; res.substituted++; parti = true; }
-      else { res.remaining++; if(estDonnee) res.remainingData++; }
-    }
-    else { res.unverified++; if(estDonnee) res.unverifiedData++; }  // relecture en echec : on ne conclut pas
-    if(parti && estDonnee) res.removedData++;
-    if(parti && suf === "strava-key" && before.state === "ok") res.keyRemoved = true;
+    try{ await rawDel(targets[i]); }catch(e){}
   }
-  return res;
-}
-/* Des copies de DONNEES sans profil sont-elles presentes sur cet appareil ?
-   LECTURE SEULE, ET RIEN D'AUTRE. Aucune suppression, aucune ecriture, et
-   aucun appelant ne peut en tirer l'une ni l'autre : cette version n'efface
-   jamais une cle non prefixee.
-   Sert a DEUX phrases du compte rendu, et a rien de plus :
-     - expliquer a qui vient de voir son historique qu'il venait de ces
-       copies-la, jamais recopiees sous son profil (sans quoi « aucune donnee
-       sous ton profil » est exact et parfaitement deroutant) ;
-     - dire que ces copies RESTENT sur l'appareil apres la suppression.
-   LECTURE EN ECHEC : `found` reste faux et les deux phrases se TAISENT. On
-   n'inverse rien -- une lecture muette ne fait pas dire « il n'y en a pas »,
-   elle fait ne rien dire du tout. Ces phrases n'expliquent que ce que l'app
-   affichait ; les taire n'a jamais rendu faux le reste du compte rendu. */
-async function legacyCopiesPresent(){
-  const res = {found:false};
-  for(let i = 0; i < WIPE_DATA_KEYS.length; i++){
+  let prouve = true;
+  // 1. Chaque cle visee, relue une par une.
+  for(let i = 0; i < targets.length; i++){
     let r = {state:"fail"};
-    try{ r = await rawGet(WIPE_DATA_KEYS[i]); }catch(e){ r = {state:"fail"}; }
-    if(r.state === "ok") res.found = true;
+    try{ r = await rawGet(targets[i]); }catch(e){ r = {state:"fail"}; }
+    if(r.state !== "absent") prouve = false;
   }
-  return res;
+  // 2. Le stockage re-enumere : plus rien sous le prefixe, hormis les deux
+  //    marques techniques -- et seulement si leur valeur est conforme (M3).
+  let apres = {names:[], enumerable:false, failed:true};
+  try{ apres = await listOwnPrefixedKeys(); }catch(e){ apres = {names:[], enumerable:false, failed:true}; }
+  if(apres.failed || !apres.enumerable) prouve = false;
+  else {
+    for(let i = 0; i < apres.names.length; i++){
+      const n = apres.names[i];
+      if(!garde(n) || !(await gardeConforme(n))){ prouve = false; break; }
+    }
+  }
+  // 3. Aucun repli ne rend plus une donnee a ce profil.
+  let lisible = true;
+  try{ lisible = await legacyStillReadable(); }catch(e){ lisible = true; }
+  if(lisible) prouve = false;
+  return prouve;
 }
-/* Remet la SESSION a zero. Sans cela, la premiere saisie suivante aurait
-   recopie sous le profil, via saveUser(), ce qui vient d'etre efface :
-   `done`, `log`, `userRaces` et `mem` tiennent encore tout en memoire. */
+/* Une donnee de CE profil reste-t-elle lisible par le repli sur les
+   anciennes cles non prefixees ? RELU DANS LE STOCKAGE, jamais deduit de la
+   memoire. LECTURE SEULE : rien n'est ecrit, rien n'est efface.
+   - Reponse CONNUE « non proprietaire » (marque a false, ou aucune preuve
+     nulle part) : sget() ne se replie jamais pour ce profil -> false. C'est
+     le cas de tous les profils arrives par invitation.
+   - Proprietaire, OU reponse inconnue : toute ancienne cle que sget() sait
+     lire compte si elle est presente (hors valeur "null", qui n'est pas une
+     donnee) ou ILLISIBLE -> true. Une lecture en echec ne prouve pas
+     l'absence. */
+async function legacyStillReadable(){
+  let ev = {value:false, known:false};
+  try{ ev = await legacyOwnerEvidence(); }catch(e){ ev = {value:false, known:false}; }
+  if(ev.known && ev.value === false) return false;
+  const lues = STORED_KEYS.concat(["profile-name"]);   // tout ce que sget() lit
+  for(let i = 0; i < lues.length; i++){
+    let r = {state:"fail", value:""};
+    try{ r = await rawGet(lues[i]); }catch(e){ r = {state:"fail", value:""}; }
+    if(r.state === "fail") return true;
+    if(r.state === "ok" && r.value !== "null") return true;
+  }
+  return false;
+}
+/* Remet la SESSION a zero, avant le re-amorcage depuis le stockage. Rien de
+   ce qui etait en memoire ne doit survivre : `done`, `log`, `userRaces` et
+   `mem` tenaient encore tout l'historique. */
 function resetSessionAfterWipe(){
   done = {}; log = {}; userRaces = [];
   mem = {}; readFailed = {}; unsavedDays = {};
   SAVE_FAILED = false; READ_BROKEN = false;
   TOMBS = null;
-  LEGACY_OWNER = false;                 // le repli est ferme, en memoire aussi
+  LEGACY_OWNER = false;                 // relu depuis le stockage juste apres
   PROFILE_NAME = "";
   sheetDay = null;
   STRAVA_ACTS = null; STRAVA_KEY = ""; STRAVA_SINCE = ""; STRAVA_SYNC_ERR = "";
   STRAVA_STATE = "nokey"; STRAVA_DIAG = {status:0, code:"", missing:[]};
   stravaProbed = false; stravaAutoTried = true;
-  backupDismissed = true;               // plus rien a sauvegarder : on n'insiste pas
+  backupDismissed = true;               // on n'insiste pas juste apres une suppression
   // Champs de saisie : l'export colle dans #iobox contient TOUT l'historique.
   try{ $("iobox").value = ""; }catch(e){}
   try{ $("planbox").value = ""; }catch(e){}
@@ -3790,6 +3983,34 @@ function resetSessionAfterWipe(){
   try{ planMsg("", ""); }catch(e){}
   try{ stravaMsg("", ""); }catch(e){}
 }
+/* RE-AMORCAGE DEPUIS LE STOCKAGE, quelle que soit l'issue de la suppression
+   (defaut m5 : apres une suppression partielle, la memoire videe affichait
+   « 1 donnée » et la coche suivante ecrasait les 30 seances encore
+   stockees). Meme ordre qu'au demarrage : l'heritage d'abord (sget() le
+   consulte a chaque repli), puis les donnees, puis ce qui en depend.
+   AUCUNE ECRITURE (pas de persistBootMarks), AUCUN APPEL RESEAU. */
+async function reseedAfterWipe(){
+  let ev = {value:false, known:false};
+  try{ ev = await legacyOwnerEvidence(); }catch(e){ ev = {value:false, known:false}; }
+  LEGACY_OWNER = (ev.value === true);
+  try{ const n = await sget("profile-name", ""); PROFILE_NAME = (typeof n === "string") ? n : ""; }
+  catch(e){ PROFILE_NAME = ""; }
+  try{ delete readFailed["profile-name"]; }catch(e){}
+  await loadUserData();
+  try{ STRAVA_ACTS = await stravaCacheLoad(); }catch(e){ STRAVA_ACTS = null; }
+  let k = "";
+  try{ k = await stravaGetKey(); }catch(e){ k = ""; }
+  // Une cle restee sur l'appareil n'est pas « absente » : son etat serveur,
+  // lui, n'est pas connu tant qu'on n'a pas interroge (jamais ici).
+  STRAVA_STATE = k ? "unknown" : "nokey";
+}
+/* LES DEUX SEULS COMPTES RENDUS, et le toast dit mot pour mot la meme chose.
+   Les trois rappels « ce qui n'est pas supprimé » suivent dans les deux cas. */
+const WIPE_DONE = "Tes données ont été supprimées de cet appareil.";
+const WIPE_PARTIAL = "La suppression n'est pas complète : une partie de tes données est peut-être encore sur cet appareil. Réessaie ; si ça persiste, contacte Enzo.";
+const WIPE_NOT_DELETED = "\nNE SONT PAS SUPPRIMÉS : tes données sur un AUTRE appareil (refais cette suppression sur chacun) ; "
+  + "ton compte côté serveur, qu'Enzo seul peut effacer (demande-le-lui) ; "
+  + "et, si tu l'avais accordée, l'autorisation Strava — retire-la sur www.strava.com/settings/apps.";
 
 try{
   $("wipedevice").addEventListener("click", async function(){
@@ -3804,47 +4025,64 @@ try{
       return;
     }
 
-    // ---- PREMIERE CONFIRMATION ----
+    // ---- UNE SEULE CONFIRMATION, sur le profil courant uniquement ----
+    /* AUCUNE PROMESSE AVANT UN GESTE IRREVERSIBLE (defaut M1). Chaque ligne
+       doit etre vraie QUELLE QUE SOIT L'ISSUE : suppression complete,
+       suppression partielle, et telephone d'Enzo, ou ses anciennes copies
+       restent lisibles. « l'app repart vide » etait faux dans ces deux
+       derniers cas -- la phrase est retiree, et remplacee par ce que l'app
+       fait vraiment : dire a la fin ce qu'il en est.
+       La ligne sur les anciennes copies n'apparait QUE pour le proprietaire
+       prouve (LEGACY_OWNER) : un autre profil ne les lit pas, et l'app ne lui
+       en revele meme pas l'existence (meme regle que « Vérifier »). */
+    const lignes = [
+      "L'app va effacer de CET APPAREIL tes données, enregistrées sous ton profil « " + PROFILE_ID + " » : tes séances cochées, ton journal (ressentis et gênes), tes courses, ton plan importé s'il y en a un, ta clé d'appareil et les caches. Ce qui est effacé l'est définitivement : l'app ne sait pas revenir en arrière.",
+      "Si une partie ne peut pas être effacée, l'app te le dira à la fin.",
+      "Si tu veux en garder une copie, annule maintenant et fais d'abord « Exporter » depuis l'onglet Journal."
+    ];
+    if(LEGACY_OWNER === true){
+      lignes.push("CE QUI N'EST PAS SUPPRIMÉ — Tes anciennes copies, enregistrées avant la mise à jour de l'app, sans profil. Cette version ne sait pas les effacer : s'il y en a sur cet appareil, elles y restent, et l'app pourra continuer de les afficher.");
+    }
+    lignes.push(
+      "CE QUI N'EST PAS SUPPRIMÉ — Les données enregistrées sur un AUTRE appareil. Elles y restent : il faut refaire cette suppression sur chacun de tes appareils.",
+      "CE QUI N'EST PAS SUPPRIMÉ — Ton compte côté serveur : ton profil et, si tu as connecté Strava, le jeton qui y est conservé. Seul Enzo peut l'effacer — demande-le-lui explicitement.",
+      "CE QUI N'EST PAS SUPPRIMÉ — Si tu as autorisé cette app à lire ton Strava, l'autorisation reste active dans TON compte Strava. Retire-la toi-même sur strava.com › Paramètres › Mes applications (www.strava.com/settings/apps). La suppression de ton compte par Enzo tente aussi de la révoquer, mais ne compte pas dessus : vérifie."
+    );
     const go = await askConfirm({
       title: "Supprimer tes données de cet appareil ?",
-      lines: [
-        "Tout ce qui est enregistré sous ton profil « " + PROFILE_ID + " » sur CET APPAREIL va être effacé : tes séances cochées, ton journal (ressentis et gênes), tes courses, ton plan importé, ta clé d'appareil et les caches. C'est immédiat et définitif : l'app ne sait pas revenir en arrière.",
-        "Si tu veux en garder une copie, annule maintenant et fais d'abord « Exporter » depuis l'onglet Journal.",
-        "CE QUI N'EST PAS SUPPRIMÉ — 1. Les données enregistrées sur un AUTRE appareil. Elles y restent : il faut refaire cette suppression sur chacun de tes appareils.",
-        "CE QUI N'EST PAS SUPPRIMÉ — 2. Ton compte côté serveur : ton profil et le jeton Strava qui y est conservé. Seul Enzo peut l'effacer — demande-le-lui explicitement.",
-        "CE QUI N'EST PAS SUPPRIMÉ — 3. Si tu as autorisé cette app à lire ton Strava, l'autorisation reste active dans TON compte Strava. Retire-la toi-même sur strava.com › Paramètres › Mes applications (www.strava.com/settings/apps). La suppression de ton compte par Enzo tente aussi de la révoquer, mais ne compte pas dessus : vérifie.",
-        "Après la suppression, l'app repart vide sur ce même profil, sur cet appareil."
-      ],
+      lines: lignes,
       okLabel: "Supprimer mes données",
       cancelLabel: "Annuler",
       danger: true
     });
     if(!go){ wipeMsg("Suppression annulée. Rien n'a été touché.", ""); return; }
 
-    /* UNE SEULE CONFIRMATION, ET ELLE NE PORTE QUE SUR LE PROFIL COURANT.
-       Les copies SANS PROFIL ne sont ici que LUES, et uniquement pour ne pas
-       raconter n'importe quoi ensuite : sur l'appareil d'Enzo, l'app affichait
-       ses 30 seances une seconde plus tot, par repli sur ces copies-la.
-       Ces deux valeurs sont relevees AVANT l'execution : la suppression ferme
-       le repli et remet LEGACY_OWNER a false. */
-    const wasOwner = LEGACY_OWNER;
-    let legacy = {found:false};
-    try{ legacy = await legacyCopiesPresent(); }catch(e){ legacy = {found:false}; }
-
-    // ---- EXECUTION. Aucun appel reseau, aucun await sur autre chose que le
-    //      stockage local : cette suppression marche hors-ligne. ----
+    // ---- EXECUTION. Aucun appel reseau : cette suppression marche hors-ligne. ----
+    WIPE_GEN++;                           // ce qui etait parti avant n'ecrira plus rien
     try{ btn.disabled = true; }catch(e){}
     wipeMsg("Suppression en cours…", "");
-    let r1 = null;
-    try{ r1 = await wipeOwnKeys(); }catch(e){ r1 = null; }
-    /* FERMETURE DU REPLI, en dernier : seule ecriture de l'operation. Sans
-       elle, sget() rendrait les anciennes copies au prochain lancement. */
-    let closed = false;
-    try{ closed = await rawSet(profileKey(LEGACY_OWN_KEY), JSON.stringify(false)); }catch(e){ closed = false; }
+    let complete = false;
+    try{ complete = (await wipeOwnKeys()) === true; }catch(e){ complete = false; }
+    WIPE_GEN++;                           // ... ni ce qui serait parti pendant
+
+    // ---- LA MEMOIRE REFLETE LE STOCKAGE REEL, quelle que soit l'issue ----
     resetSessionAfterWipe();
+    let relu = false;
+    try{ await reseedAfterWipe(); relu = true; }catch(e){ relu = false; }
+    if(!relu){
+      /* Re-amorcage en echec : la memoire est vide, le stockage peut ne pas
+         l'etre. On protege comme une lecture en echec -- saveUser() refusera
+         toute ecriture plutot que d'ecraser ce qui reste. */
+      USER_KEYS.forEach(function(k){ readFailed[k] = true; });
+      READ_BROKEN = true;
+    }
+    /* LE PLAN AUSSI (defaut m-a) : re-resolu depuis le stockage, comme au
+       demarrage, sans reseau ni ecriture. Un plan importe efface ne reste pas
+       actif en memoire -- ni a l'ecran, ni dans un export. */
+    try{ await replanFromStorage(); }catch(e){}
     try{ btn.disabled = false; }catch(e){}
 
-    // ---- REAFFICHAGE : l'app doit se retrouver vide et coherente ----
+    // ---- REAFFICHAGE ----
     try{ renderProfileNote(); }catch(e){}
     try{ renderSaveBanner(); }catch(e){}
     try{ renderStravaCard(); }catch(e){}
@@ -3853,157 +4091,10 @@ try{
     try{ renderAll(); }catch(e){}
     try{ await renderBackupNote(); }catch(e){}
 
-    // ---- COMPTE RENDU : ce qui est parti, ce qui reste ----
-    if(!r1){
-      wipeMsg("La suppression n'a pas pu être menée à bien : le stockage de cet appareil n'a pas répondu. "
-        + "Une partie de tes données peut être encore présente. Réessaie ; si ça persiste, "
-        + "ferme complètement l'app, rouvre-la et recommence.", "err");
-      toast("⚠ Suppression incomplète", 6000);
-      return;
-    }
-    /* CE QUI A RESISTE. Rien ici ne doit dire « incomplet » pour une donnee
-       en realite partie, ni « complet » quand un doute subsiste. */
-    const reste = [];
-    /* « N données » compte la MEME chose ici que dans « Supprimé : N
-       données » et que dans le panneau « Vérifier mes données » : les
-       seances, le journal, les courses, le plan importe. Les reglages et
-       les caches qui ont resiste sont dits, mais a part -- les additionner
-       faisait annoncer « 7 données n'ont pas pu être effacées » a un profil
-       qui en avait 3. */
-    if(r1.remaining){
-      const l = wipeLot(r1.remainingData, r1.remaining - r1.remainingData);
-      reste.push(l.t + " de ton profil n'" + (l.pl?"ont":"a") + " pas pu être effacé" + (l.f?"e":"") + (l.pl?"s":""));
-    }
-    if(r1.unverified){
-      const l = wipeLot(r1.unverifiedData, r1.unverified - r1.unverifiedData);
-      reste.push((l.pl ? "les suppressions de " : "la suppression de ") + l.t + " de ton profil n'"
-        + (l.pl?"ont":"a") + " pas pu être vérifiée" + (l.pl?"s":""));
-    }
-    if(r1.listFailed) reste.push("le stockage n'a pas pu être énuméré : il peut rester des clés que l'app ne connaît pas");
-    if(!closed) reste.push("le repli sur les copies sans profil n'a pas pu être fermé : des données pourraient réapparaître au prochain lancement");
-
-    /* CE DONT ON N'EST PAS SUR. Ce ne sont pas des echecs -- l'annoncer comme
-       une suppression incomplete enverrait recommencer pour rien --, mais les
-       taire serait annoncer un succes qu'on n'a pas mesure. */
-    const doutes = [];
-    if(r1.notEnumerable) doutes.push("le stockage de cet appareil ne sait pas lister ses clés : la suppression a porté "
-      + "sur toutes les clés connues de l'app, mais s'il en restait d'autres sous ton profil, l'app ne peut pas le savoir");
-    if(r1.substituted) doutes.push("le stockage de cet appareil ne sait pas retirer une clé : son contenu a été écrasé à la place ("
-      + r1.substituted + " clé" + (r1.substituted>1?"s":"") + "). La donnée n'est plus lisible et l'app ne l'affichera plus, "
-      + "mais la clé elle-même reste présente");
-
-    /* « N données » = ce qu'une personne appelle ses donnees, pas les
-       reglages internes que la suppression emporte aussi. */
-    const efface = r1.removedData;
-    /* CE QUI RESTE ET CE QU'ON N'A PAS SU MESURER. Sans ces deux totaux, le
-       compte rendu affirmait « aucune donnée d'entraînement n'était
-       enregistrée sous ton profil » et « tes réglages et les caches ont été
-       effacés » a quelqu'un dont le journal de gênes etait intact sur
-       l'appareil, une seconde plus tot comme une seconde plus tard. Une
-       absence ne se deduit QUE de ce qui est parti ET de ce qui reste :
-       n'avoir rien efface ne prouve pas qu'il n'y avait rien. */
-    const resteData = r1.remainingData;
-    const douteData = r1.unverifiedData;
-    /* LES REGLAGES ET LES CACHES ONT-ILS VRAIMENT ETE EFFACES ?
-       CE QUI ETAIT PRESENT, ET CE QUI EST PARTI -- pas seulement ce qui
-       reste. L'ancienne formule ne regardait QUE le reliquat : zero cible
-       donnait zero reliquat, donc « effacés », et un profil strictement vide
-       lisait l'affirmation d'un effacement qui n'avait jamais eu lieu. On
-       n'affirme rien quand rien n'etait present. */
-    const regsGone = r1.removed - r1.removedData;
-    const regsLeft = (r1.remaining - r1.remainingData) + (r1.unverified - r1.unverifiedData);
-    const regsOk = (r1.presentTech > 0) && (regsGone > 0) && (regsLeft === 0);
-    /* NE NOMMER QUE CE QUI A REELLEMENT ETE VISE. « ta clé d'appareil »
-       englobait la copie NON PREFIXEE, que rien n'efface jamais : le compte
-       rendu la declarait effacée pendant que le panneau la declarait
-       conservée, deux lignes plus loin. Elle n'est nommee que si la copie
-       enregistrée SOUS LE PROFIL existait et est bien partie. */
-    const reglages = r1.keyRemoved ? "ta clé d'appareil, tes réglages et les caches"
-                                   : "tes réglages et les caches";
-    /* RIEN N'ETAIT LA. Ce n'est ni un succes ni un echec : on ne le peint pas
-       en vert, et on n'affirme aucun effacement. */
-    const rienAEffacer = (r1.present === 0 && r1.removed === 0);
-    let txt;
-    if(efface > 0){
-      txt = "Supprimé de cet appareil : " + efface + " donnée" + (efface>1?"s":"") + " d'entraînement"
-        + " (parmi : séances, journal, courses, plan importé)"
-        + " sous ton profil « " + PROFILE_ID + " »"
-        + (regsOk ? ", ainsi que " + reglages + "." : ".");
-    } else if(resteData || douteData){
-      /* RIEN N'EST PARTI, ET IL Y AVAIT BIEN QUELQUE CHOSE. Le detail chiffre
-         est deja en premiere ligne (« ⚠ Suppression INCOMPLÈTE — … ») : on ne
-         le repete pas, on se contente de ne rien nier.
-         CE QUI RESTE et CE QU'ON N'A PAS SU MESURER ne se disent pas de la
-         meme facon. « n'a pas pu être supprimée » affirme un echec ; quand
-         la seule chose qui a manque est la RELECTURE de controle, l'echec
-         n'est pas etabli, et le dire serait le symetrique du defaut qu'on
-         corrige ici. */
-      txt = resteData
-        ? ("Aucune donnée d'entraînement n'a pu être supprimée sous ton profil « " + PROFILE_ID + " » : "
-           + (resteData > 1 ? "elles sont" : "elle est") + " toujours sur cet appareil"
-           + (douteData ? ", et pour d'autres l'app n'a pas pu le vérifier." : "."))
-        : ("L'app n'a pas pu vérifier si tes données d'entraînement ont bien été supprimées sous ton profil « "
-           + PROFILE_ID + " » : elles sont peut-être encore sur cet appareil.");
-      txt += (regsOk ? " " + reglages.charAt(0).toUpperCase() + reglages.slice(1) + " ont été effacés." : "");
-    } else if(wasOwner && legacy.found){
-      /* LA NUANCE VIENT D'ABORD, PAS APRES. Sur l'appareil d'Enzo, l'app
-         affichait 30 seances une seconde plus tot : elles venaient du repli
-         sur les copies sans profil, jamais recopiees sous le prefixe.
-         « Aucune donnée d'entraînement n'était enregistrée sous ton profil »
-         est exact au sens des cles prefixees, et deroutant a lire pour qui
-         vient de voir son historique. On explique AVANT.
-         `wasOwner` : cette phrase revendique une propriete (« tes anciennes
-         copies »), elle ne se dit donc QUE quand cette propriete a ete
-         PROUVEE avant la suppression. */
-      txt = "Ce que l'app t'affichait venait de tes anciennes copies SANS PROFIL, jamais recopiées sous ton profil « "
-        + PROFILE_ID + " » : il n'y avait donc aucune donnée d'entraînement à supprimer sous ce profil."
-        + (regsOk ? " " + reglages.charAt(0).toUpperCase() + reglages.slice(1) + " ont été effacés." : "");
-    } else if(rienAEffacer){
-      /* RIEN N'ETAIT ENREGISTRE, ET ON NE FAIT SEMBLANT DE RIEN. Pas un mot
-         sur un effacement : il n'y en a pas eu. */
-      txt = "L'app n'a rien trouvé à supprimer sous ton profil « " + PROFILE_ID + " » sur cet appareil : "
-        + "ni donnée d'entraînement, ni réglage, ni cache. Rien n'a donc été effacé.";
-    } else {
-      txt = "Aucune donnée d'entraînement n'était enregistrée sous ton profil « " + PROFILE_ID + " » sur cet appareil"
-        + (regsOk ? " : " + reglages + " ont été effacés." : ".");
-    }
-    /* CE QUI RESTE SUR L'APPAREIL, ET QUE CETTE VERSION N'EFFACE PAS.
-       Deux phrases, parce que « propriétaire » et « pas propriétaire » ne se
-       disent pas pareil -- mais AUCUNE des deux ne nie ni ne revendique une
-       propriété que l'app ne connaît pas. */
-    if(legacy.found){
-      txt += wasOwner
-        ? "\nTes anciennes copies SANS PROFIL restent sur cet appareil : cette version de l'app ne sait pas les effacer. Elle ne les affichera plus, ne les modifiera plus, et elles ne réapparaîtront pas."
-        : "\nDes copies sans profil restent sur cet appareil : l'app ne les affiche pas, ne les modifie pas et ne les supprime pas.";
-    }
-    txt += "\nLe plan affiché reste celui de cette session ; le plan par défaut reviendra au prochain lancement.";
-    txt += "\nNE SONT PAS SUPPRIMÉS : tes données sur un AUTRE appareil (refais cette suppression sur chacun) ; "
-      + "ton compte côté serveur, qu'Enzo seul peut effacer (demande-le-lui) ; "
-      + "et, si tu l'avais accordée, l'autorisation Strava — retire-la sur www.strava.com/settings/apps.";
-    const aVerifier = doutes.length ? ("\nÀ VÉRIFIER — " + doutes.join(" ; ") + ".") : "";
-    if(reste.length){
-      wipeMsg("⚠ Suppression INCOMPLÈTE — " + reste.join(" ; ") + ".\n" + txt + aVerifier
-        + "\nLibère de l'espace (Réglages › Safari › Données de sites), sors de la navigation privée, puis recommence.", "err");
-      toast("⚠ Suppression incomplète — lis le détail dans Zones", 7000);
-      return;
-    }
-    if(doutes.length){
-      // Pas un echec, pas un succes franc : on le dit sans crier, et sans
-      // envoyer recommencer une suppression qui a bien eu lieu.
-      wipeMsg(txt + aVerifier, "");
-      toast("Données supprimées — un point à vérifier dans Zones", 6000);
-      return;
-    }
-    /* PAS DE SUCCES FRANC QUAND RIEN N'A ETE EFFACE. Le vert et le « ✓ » se
-       lisent comme une confirmation d'effacement : les afficher sur un profil
-       ou il n'y avait rien, c'est affirmer un acte qui n'a pas eu lieu. */
-    if(rienAEffacer){
-      wipeMsg(txt, "");
-      toast("Rien à supprimer sous ce profil — détail dans Zones", 5000);
-      return;
-    }
-    wipeMsg(txt, "ok");
-    toast("Données supprimées de cet appareil ✓", 5000);
+    // ---- COMPTE RENDU : DEUX ISSUES, PAS PLUS ----
+    const tete = complete ? WIPE_DONE : WIPE_PARTIAL;
+    wipeMsg(tete + WIPE_NOT_DELETED, complete ? "ok" : "err");
+    toast(tete, complete ? 5000 : 9000);
   });
 }catch(e){ /* la carte de suppression ne doit jamais empecher l'app de demarrer */ }
 
@@ -4207,52 +4298,99 @@ async function joinAccept(id, key, name){
     setTimeout(function(){ try{ toast("Bienvenue " + (name || id) + " ✓", 4000); }catch(e){} }, 700);
     return;
   }
-  /* LA MARQUE N'A PAS PU ETRE POSEE : rien n'a ete ecrit sous le prefixe, et
-     c'est VOULU (second verrou ci-dessus). L'invitation est consommee : la
-     cle est montree ici, une seule fois, comme dans l'autre cas d'echec.
-
-     DEUX CAUSES, DEUX REMEDES, ET LE PRECEDENT ETAIT FAUX DANS LES DEUX CAS.
-     Le message disait « Libère de l'espace, sors de la navigation privée …
-     puis recommence » — exactement ce que le commentaire ci-dessus refuse de
-     faire (accuser le stockage d'etre plein), et « recommence » CONSOMME UNE
-     NOUVELLE INVITATION A USAGE UNIQUE a chaque tour. On nomme donc la vraie
-     cause, et on previent du cout d'un nouvel essai :
-       - `!ev.known` : la question « a qui sont les donnees deja presentes ? »
-         est restee SANS REPONSE — cet appareil porte une ancienne clé
-         d'appareil que l'app ne sait pas interpréter, ou le stockage n'a pas
-         repondu. Rien ne sera different au prochain essai tant que ce point
-         n'est pas regle : envoyer recommencer serait brûler des invitations.
-       - `ev.known` mais ecriture refusee : la, le stockage a bien refuse
-         d'ecrire, et l'espace ou la navigation privee sont en cause. */
+  /* LA MARQUE N'A PAS PU ETRE POSEE (`okOwn` faux). TROIS CAUSES POSSIBLES,
+     ET L'APP N'EN AFFIRME AUCUNE : la question « a qui sont les donnees deja
+     presentes ? » est restee sans reponse (ancienne cle d'appareil non
+     interpretable, OU simple lecture en echec), ou la marque n'a pas pu etre
+     lue, ou son ecriture a ete refusee. Le message precedent affirmait
+     « clé non interprétable, recommencer ne changera rien » meme pour une
+     lecture passagere en echec.
+     ON NE DIT QUE CE QUI EST VRAI DANS LES TROIS CAS : l'invitation a ete
+     acceptee (le serveur a repondu 200), elle est consommee, et le profil
+     n'est pas enregistre sur cet appareil (ni ancre ni cle : elles ne
+     s'ecrivent qu'apres la marque). On ne dit PAS « rien n'a été
+     enregistré » : une ecriture de marque annoncee en echec peut avoir
+     abouti quand meme.
+     PAS DE « CONTINUER » ICI, ET PLUS DE CLE AFFICHEE (defaut m4). Continuer
+     faisait demarrer l'app sous ce prefixe SANS MARQUE : la sonde, le cache du
+     plan et la premiere coche ecrivaient sous `<profil>:` -- exactement ce que
+     le second verrou interdit, et de quoi rendre ambigu l'appareil d'Enzo au
+     lancement suivant. Sans profil enregistre, la cle ne peut plus servir a
+     rien sur cet appareil : la montrer n'aurait fait qu'exposer un secret.
+     La session oublie le profil : plus aucune ecriture n'est possible. */
   if(!okOwn){
-    const sansReponse = !ev.known;
-    joinMsg("Ton compte est créé, mais cet appareil n'a pas pu enregistrer à qui appartiennent les données "
-      + "déjà présentes ici. Rien n'a donc été écrit sous ton profil : c'est volontaire, pour ne pas risquer "
-      + "de mélanger tes données avec celles de la personne qui utilisait cet appareil avant toi. "
-      + "Note ta clé maintenant, elle ne sera plus affichée :\n\n"
-      + key + "\n\n"
-      + (sansReponse
-        ? "CE N'EST NI UN MANQUE D'ESPACE NI LA NAVIGATION PRIVÉE : cet appareil porte une ancienne clé "
-          + "d'appareil que l'app ne sait pas interpréter, et tant qu'elle est là, la question reste sans "
-          + "réponse. Recommencer ne changera rien de ce côté."
-        : "Cet appareil a refusé d'enregistrer : libère de l'espace et sors de la navigation privée avant "
-          + "tout nouvel essai.")
-      + " ⚠ Ton invitation vient d'être utilisée : elle ne sert qu'une fois. Un nouvel essai exigera une "
-      + "NOUVELLE invitation — préviens Enzo du problème plutôt que de réessayer à vide. "
-      + "Tu peux continuer dès maintenant, mais rien ne sera conservé à la fermeture de l'app.", "err");
-    try{ $("joinforce").classList.remove("hidden"); }catch(e){}
+    PROFILE_ID = ""; PROFILE_NAME = ""; STRAVA_KEY = ""; LEGACY_OWNER = false;
+    try{ renderProfileNote(); }catch(e){}
+    try{ $("joinforce").classList.add("hidden"); }catch(e){}
+    /* PAS D'INVITATION A RECOMMENCER (defaut m-d). L'ancien message disait
+       « il faudra une nouvelle invitation » : sur un appareil ou l'echec est
+       durable (ancienne cle d'appareil qu'on ne sait pas attribuer), chaque
+       nouvelle invitation etait consommee pour rien. Le cas CERTAIN est
+       desormais arrete avant l'appel (joinLocalCertainFailure) ; pour les
+       autres, on ne promet pas qu'un nouvel essai marchera. */
+    joinMsg("L'invitation a été acceptée, mais cet appareil n'a pas pu enregistrer ton profil. "
+      + "⚠ Cette invitation est maintenant utilisée : elle ne sert qu'une fois. "
+      + "Ne recommence pas avec une nouvelle invitation sans en parler à Enzo : sur cet appareil, "
+      + "un nouvel essai pourrait échouer de la même façon. Contacte-le et décris-lui ce message.", "err");
     return;
   }
-  /* ECRITURE IMPOSSIBLE (stockage plein, navigation privee). L'invitation est
-     CONSOMMEE et la cle ne se retrouve pas : la cacher condamnerait la
-     personne a redemander une invitation. On la montre UNE FOIS, ici, sur son
-     propre ecran, et on laisse le choix de continuer sans enregistrer. */
-  joinMsg("Ton compte est créé, mais cet appareil n'a pas pu enregistrer la clé "
-    + "(stockage plein, ou navigation privée). Note-la maintenant, elle ne sera plus affichée :\n\n"
+  /* LA MARQUE EST POSEE, MAIS L'ANCRE OU LA CLE N'ONT PAS PU S'ECRIRE.
+     L'invitation est CONSOMMEE et la cle ne se retrouve pas : la cacher
+     condamnerait la personne a redemander une invitation. On la montre UNE
+     FOIS, ici, sur son propre ecran. Continuer est legitime : la marque est
+     la, les ecritures sous le prefixe sont donc permises.
+     SANS AFFIRMER DE CAUSE, ET SANS PROMETTRE QUE RIEN NE SERA CONSERVE :
+     les ecritures suivantes peuvent tres bien reussir. */
+  joinMsg("L'invitation a été acceptée, mais cet appareil n'a pas pu tout enregistrer. "
+    + "Note ta clé maintenant, elle ne sera plus affichée :\n\n"
     + key + "\n\n"
-    + "Libère de l'espace, sors de la navigation privée, puis saisis-la dans l'onglet Zones. "
-    + "Tu peux continuer dès maintenant, mais rien ne sera conservé à la fermeture de l'app.", "err");
+    + "Tu peux continuer vers l'app et la saisir dans l'onglet Zones. Si l'app n'arrive toujours pas à "
+    + "enregistrer, un bandeau te le signalera : libère alors de l'espace et sors de la navigation privée.", "err");
   try{ $("joinforce").classList.remove("hidden"); }catch(e){}
+}
+/* L'ENREGISTREMENT LOCAL ECHOUERA-T-IL A COUP SUR ? (defaut m-d)
+   joinAccept n'ecrit rien tant que la marque d'heritage du profil rejoint
+   n'est pas tranchee (legacyOwnerEvidence doit rendre `known`). Une
+   configuration rend cette reponse IMPOSSIBLE, quel que soit le profil que
+   designera l'invitation -- et on ne le connait pas avant `join` :
+     1. l'ancienne cle d'appareil NON PREFIXEE `strava-key` est PRESENTE mais
+        ne nomme aucun profil (format d'avant l'etape 2, ou valeur videe) :
+        c'est la seconde preuve de legacyOwnerEvidence, et elle rend alors
+        known:false ;
+     2. et AUCUNE marque `<profil>:legacy-owner` n'existe sur l'appareil --
+        donc pas celle du profil rejoint, qui aurait tranche en premier.
+   Appeler `join` consommerait alors l'invitation pour rien, a chaque essai.
+   Rend true SEULEMENT si les deux points sont ETABLIS par des lectures
+   reussies. Une lecture en echec, un stockage qui ne sait pas s'enumerer, ou
+   la moindre marque presente : false -- on ne sait pas, et on laisse faire
+   comme avant. LECTURE SEULE, aucun appel reseau, aucune ecriture. */
+async function joinLocalCertainFailure(){
+  let lk = {state:"fail", value:""};
+  try{ lk = await rawGet("strava-key"); }catch(e){ return false; }
+  if(lk.state !== "ok") return false;
+  if(idFromDeviceKey(lk.value)) return false;          // elle nomme un profil : une reponse est possible
+  let st = null;
+  try{ st = winStore(); }catch(e){ return false; }
+  let names = null;
+  if(st){
+    if(typeof st.keys !== "function") return false;
+    try{ names = await st.keys(); }catch(e){ return false; }
+  } else {
+    try{
+      names = [];
+      for(let i = 0; i < localStorage.length; i++) names.push(localStorage.key(i));
+    }catch(e){ return false; }
+  }
+  if(!Array.isArray(names)) return false;
+  for(let i = 0; i < names.length; i++){
+    const n = names[i];
+    if(typeof n !== "string") continue;
+    const j = n.indexOf(PROFILE_SEP);
+    if(j <= 0) continue;
+    // Une marque, meme illisible, meme d'un autre profil : on ne sait plus.
+    if(n.slice(j + 1) === LEGACY_OWN_KEY) return false;
+  }
+  return true;
 }
 async function joinSubmit(){
   if(joinBusy) return;                        // verrou : jamais deux remises du meme code en vol
@@ -4271,6 +4409,20 @@ async function joinSubmit(){
 
   joinBusy = true;
   try{ $("joingo").disabled = true; }catch(e){}
+  /* ECHEC LOCAL CERTAIN : on n'appelle PAS le serveur, l'invitation n'est
+     donc pas consommee. On ne propose pas de reessayer : ce serait la meme
+     issue a chaque fois. */
+  let certain = false;
+  try{ certain = (await joinLocalCertainFailure()) === true; }catch(e){ certain = false; }
+  if(certain){
+    joinBusy = false;
+    try{ $("joingo").disabled = false; }catch(e){}
+    joinMsg("Cet appareil ne peut pas être rattaché à un profil pour l'instant : il contient une ancienne clé "
+      + "d'appareil que l'app ne sait pas attribuer, et elle ne décide pas à ta place à qui sont les données "
+      + "déjà présentes. Ton invitation n'a PAS été utilisée : garde-la. Ne réessaie pas, le résultat serait "
+      + "le même : contacte Enzo.", "err");
+    return;
+  }
   joinMsg("Vérification de l'invitation…", "");
   let r;
   try{ r = await joinCall(code, name); }
@@ -4279,13 +4431,21 @@ async function joinSubmit(){
   try{ $("joingo").disabled = false; }catch(e){}
 
   // ---- TROIS CAUSES, TROIS MESSAGES ----
+  /* PAS DE REPONSE (hors ligne, ou delai depasse) : MEME INCERTITUDE que sur
+     503/500 (join.js, limite m-c). La requete a pu ne jamais partir (le code
+     resservira), ou le serveur a pu la traiter et prendre le code avant que
+     la reponse ne se perde (il sera refuse). Ces deux messages ne disent donc
+     ni « ce n'est pas ton code », ni que le meme code marchera : ils disent
+     quoi faire s'il est refuse. */
   if(r.reason === "network"){
-    joinMsg("Serveur injoignable. Tu es hors-ligne, ou le site est inaccessible — ce n'est pas ton code. "
-      + "Rejoindre demande une connexion, une seule fois : réessaie une fois connecté.", "err");
+    joinMsg("Aucune réponse du serveur : pas de connexion, connexion coupée, ou site inaccessible. "
+      + "Rejoindre demande une connexion. Réessaie une fois connecté, avec le même code ; "
+      + "s'il est refusé, demande un nouveau lien à Enzo.", "err");
     return;
   }
   if(r.reason === "timeout"){
-    joinMsg("Le serveur n'a pas répondu en " + (JOIN_TIMEOUT / 1000) + " s. Ce n'est pas ton code : réessaie dans un instant.", "err");
+    joinMsg("Le serveur n'a pas répondu en " + (JOIN_TIMEOUT / 1000) + " s. Réessaie dans un instant avec le même code ; "
+      + "s'il est refusé, demande un nouveau lien à Enzo.", "err");
     return;
   }
   if(r.status === 403){ joinMsg(JOIN_BAD_CODE, "err"); return; }
@@ -4295,8 +4455,14 @@ async function joinSubmit(){
   }
   if(!r.ok){
     const berr = (isPlainObject(r.body) && typeof r.body.error === "string") ? r.body.error : "";
-    joinMsg("Le serveur n'a pas pu traiter la demande (HTTP " + (r.status || 0) + (berr ? " · " + berr : "")
-      + "). Ce n'est pas ton code : réessaie plus tard, ou signale ce code à Enzo.", "err");
+    /* L'APP NE SAIT PAS SI LE CODE A ETE CONSOMME (join.js, limite m-c) :
+       l'echec a pu survenir avant la prise du code (il resservira) ou apres
+       (il sera refuse ; rien ne le rend). Le message doit etre vrai dans les
+       deux cas : il ne promet donc pas que le code resservira, il dit quoi
+       faire s'il est refuse. */
+    joinMsg("La connexion n'a pas abouti (HTTP " + (r.status || 0) + (berr ? " · " + berr : "")
+      + "). Réessaie avec le même code ; s'il est refusé, demande un nouveau lien à Enzo, "
+      + "en lui signalant ce code d'erreur.", "err");
     return;
   }
 
@@ -4319,8 +4485,19 @@ try{
   $("joinname").addEventListener("keydown", function(e){ if(e && e.key === "Enter") joinSubmit(); });
   $("joincode").addEventListener("keydown", function(e){ if(e && e.key === "Enter") joinSubmit(); });
   $("joinforce").addEventListener("click", async function(){
-    // Poursuite en session seulement : rien n'a pu etre enregistre, et l'app
-    // le dira a chaque ecriture (bandeau #savealert).
+    /* N'est propose QUE quand la marque d'heritage est posee (cf. joinAccept) :
+       les ecritures sous le prefixe sont alors permises. Si l'une echoue,
+       l'app le dit (bandeau #savealert). DERNIER VERROU : sans profil, ou si
+       la marque n'est pas relue a l'instant, on ne demarre pas sous ce
+       prefixe. */
+    let marque = {state:"fail"};
+    try{ if(PROFILE_ID) marque = await rawGet(profileKey(LEGACY_OWN_KEY)); }catch(e){ marque = {state:"fail"}; }
+    if(!PROFILE_ID || marque.state !== "ok"){
+      try{ $("joinforce").classList.add("hidden"); }catch(e){}
+      joinMsg("Cet appareil n'arrive pas à relire ton profil : l'app ne démarre pas sous ce profil, par précaution. "
+        + "Ferme complètement l'app et rouvre-la ; si l'écran de connexion revient, préviens Enzo.", "err");
+      return;
+    }
     hideJoinScreen();
     await startApp();
   });
@@ -4345,24 +4522,30 @@ function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add(
    ce qui fait que, une fois l'appareil rattache, tous les lancements
    suivants fonctionnent hors-ligne. */
 let appStarted = false;
+/* Charge les trois cles de donnees DEPUIS LE STOCKAGE. Seule implementation :
+   startApp() et la suppression sur l'appareil (re-amorcage) passent par ici,
+   pour que la memoire ne puisse jamais diverger du stockage d'une facon que
+   l'autre chemin ne connaitrait pas.
+   Aucune etape de migration : sget() lit la cle prefixee et se replie de
+   lui-meme sur l'ancienne cle quand elle est ABSENTE (proprietaire seulement). */
+async function loadUserData(){
+  const d0 = await sget("tgcm-done", {});   done     = isPlainObject(d0) ? d0 : {};
+  const r0 = await sget("tgcm-races", []);  userRaces = Array.isArray(r0) ? r0 : [];
+  const l0 = await sget("tgcm-log", {});    log      = isPlainObject(l0) ? l0 : {};
+  // Valeur lisible mais de forme inattendue : on ne sait pas non plus la
+  // reprendre, donc on la protege comme une lecture en echec.
+  if(!isPlainObject(d0)) readFailed["tgcm-done"]  = true;
+  if(!Array.isArray(r0)) readFailed["tgcm-races"] = true;
+  if(!isPlainObject(l0)) readFailed["tgcm-log"]   = true;
+  noteReadFailures();
+}
 async function startApp(){
   if(appStarted) return;                 // jamais deux demarrages (rejoindre puis relancer)
   appStarted = true;
   try{
     $("prevwk").addEventListener("click", ()=>{ if(curWk>0){curWk--; renderWeek();} });
     $("nextwk").addEventListener("click", ()=>{ if(curWk<WEEKS.length-1){curWk++; renderWeek();} });
-    // Aucune etape de migration : sget() lit la cle prefixee et se replie de
-    // lui-meme sur l'ancienne cle quand elle est ABSENTE. Rien a preparer,
-    // rien qui puisse echouer avant le chargement des donnees.
-    const d0 = await sget("tgcm-done", {});   done     = isPlainObject(d0) ? d0 : {};
-    const r0 = await sget("tgcm-races", []);  userRaces = Array.isArray(r0) ? r0 : [];
-    const l0 = await sget("tgcm-log", {});    log      = isPlainObject(l0) ? l0 : {};
-    // Valeur lisible mais de forme inattendue : on ne sait pas non plus la
-    // reprendre, donc on la protege comme une lecture en echec.
-    if(!isPlainObject(d0)) readFailed["tgcm-done"]  = true;
-    if(!Array.isArray(r0)) readFailed["tgcm-races"] = true;
-    if(!isPlainObject(l0)) readFailed["tgcm-log"]   = true;
-    noteReadFailures();
+    await loadUserData();
     // Cache Strava : lecture LOCALE (jamais reseau) avant le premier rendu, pour
     // que les coches deduites soient la des l'ouverture, sans clignotement.
     // Ce n'est PAS une cle utilisateur : un echec est benin et silencieux.
