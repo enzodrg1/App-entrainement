@@ -40,16 +40,25 @@ header{padding:calc(14px + env(safe-area-inset-top)) 18px 0}
 .eyebrow{font-family:var(--disp); font-weight:600; letter-spacing:.14em; text-transform:uppercase; font-size:12px; color:var(--orange)}
 h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:34px; line-height:1; margin:4px 0 2px; letter-spacing:.01em}
 .sub{color:var(--muted); font-size:13.5px; margin:0 0 6px}
+/* En-tete : nom, sous-titre et surtitre de la course viennent du plan. */
+header h1, header .sub, header .eyebrow{overflow-wrap:anywhere}
 .countdown{display:inline-flex; align-items:baseline; gap:6px; background:var(--orange-soft); border:1px solid rgba(255,107,53,.35); border-radius:999px; padding:4px 12px; margin-top:4px}
 .countdown b{font-family:var(--disp); font-size:20px; font-weight:700; color:var(--orange)}
 .countdown span{font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em}
 .profile{margin:14px 6px 4px; position:relative}
 .profile svg{width:100%; height:86px; display:block}
 .wk-dot{cursor:pointer}
-.profile-caption{display:flex; justify-content:space-between; padding:0 14px; font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; font-family:var(--disp)}
+.profile-caption{display:flex; flex-wrap:wrap; gap:2px 10px; justify-content:space-between; min-width:0; padding:0 14px; font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; font-family:var(--disp)}
+.profile-caption>span{min-width:0; overflow-wrap:anywhere}
 .wknav{display:flex; align-items:center; justify-content:space-between; padding:8px 14px 4px}
 .wknav .title{font-family:var(--disp); font-weight:600; text-transform:uppercase; font-size:19px; letter-spacing:.03em}
 .wknav .meta{font-size:12.5px; color:var(--muted)}
+/* Libelle et phase viennent du plan importe : un long jeton sans espace passe
+   a la ligne au lieu de pousser la fleche › hors de l'ecran. Les fleches
+   gardent leur largeur. */
+.wknav>div{min-width:0}
+.wknav .title, .wknav .meta{overflow-wrap:anywhere}
+.wknav .arrow{flex:none}
 .arrow{width:40px; height:40px; border-radius:12px; background:var(--panel); border:1px solid var(--line); font-size:18px; color:var(--ink)}
 .arrow:disabled{opacity:.3}
 .days{padding:6px 12px 10px; display:flex; flex-direction:column; gap:8px}
@@ -66,7 +75,7 @@ h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size
 .day .main{flex:1; padding:10px 8px 10px 6px; min-width:0}
 .day .stitle{font-weight:600; font-size:14.5px; line-height:1.25}
 .day .schips{display:flex; gap:6px; margin-top:4px; flex-wrap:wrap}
-.chip{font-size:11px; color:var(--muted); background:var(--panel2); border-radius:6px; padding:2px 7px}
+.chip{font-size:11px; color:var(--muted); background:var(--panel2); border-radius:6px; padding:2px 7px; min-width:0; overflow-wrap:anywhere}
 .chip.hot{color:var(--orange); background:var(--orange-soft)}
 .chip.care{color:var(--amber); background:rgba(224,168,62,.12)}
 /* Puce Strava : moss, VOLONTAIREMENT distincte d'une validation manuelle.
@@ -119,7 +128,7 @@ h1{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size
 .sheet.ask .sbody{padding:10px 18px 4px}
 .sheet.ask .actions{padding:10px 18px calc(14px + env(safe-area-inset-bottom))}
 .sheet.ask .shead h2{font-size:21px; margin-bottom:2px}
-#askbody p{margin:0 0 10px; font-size:14.5px; line-height:1.5; color:var(--ink)}
+#askbody p{margin:0 0 10px; font-size:14.5px; line-height:1.5; color:var(--ink); overflow-wrap:anywhere}
 #askbody p:last-child{margin-bottom:0}
 #askbody p.lead{color:var(--amber); font-weight:600}
 nav.tabs{position:fixed; bottom:0; left:0; right:0; display:flex; background:rgba(14,27,22,.94); backdrop-filter:blur(8px); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:30}
@@ -135,6 +144,9 @@ nav.tabs .ico{font-size:17px; line-height:1}
 .race-card .jj{position:absolute; top:12px; right:12px; font-family:var(--disp); font-weight:700; color:var(--orange); font-size:18px}
 .race-card .rnotes{font-size:13px; color:var(--muted); margin-top:6px}
 .race-card .del{position:absolute; bottom:10px; right:12px; color:var(--dim); font-size:12.5px; text-decoration:underline}
+/* Textes venus du plan (ou saisis) : meme protection que .card li. */
+.race-card h3, .race-card .rnotes{overflow-wrap:anywhere}
+.race-card .chip{min-width:0; overflow-wrap:anywhere}
 .addform{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:6px}
 .addform h3{font-family:var(--disp); text-transform:uppercase; font-weight:600; letter-spacing:.08em; font-size:14px; margin:0 0 10px; color:var(--moss)}
 .frow{display:flex; gap:8px; margin-bottom:8px}
@@ -149,17 +161,23 @@ table.zones{width:100%; border-collapse:collapse; font-size:13.5px}
 table.zones th{font-family:var(--disp); text-transform:uppercase; letter-spacing:.06em; font-weight:600; font-size:12px; color:var(--moss); text-align:left; padding:8px 6px; border-bottom:1px solid var(--line)}
 table.zones td{padding:9px 6px; border-bottom:1px dashed var(--line); vertical-align:top}
 table.zones td b{font-family:var(--disp); font-size:15px; letter-spacing:.02em}
+table.zones td{overflow-wrap:anywhere}
 .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-top:12px}
 .card.care{border-color:rgba(224,168,62,.35)}
-.card h3{font-family:var(--disp); text-transform:uppercase; font-weight:600; letter-spacing:.08em; font-size:13.5px; margin:0 0 8px}
+.card h3{font-family:var(--disp); text-transform:uppercase; font-weight:600; letter-spacing:.08em; font-size:13.5px; margin:0 0 8px; overflow-wrap:anywhere}
 .card.care h3{color:var(--amber)}
 .card ul{margin:0; padding-left:18px}
-.card li{font-size:13.5px; line-height:1.5; margin-bottom:5px}
+.card li{font-size:13.5px; line-height:1.5; margin-bottom:5px; overflow-wrap:anywhere}
 .note{font-size:12.5px; color:var(--muted); line-height:1.45; margin-top:12px}
+/* Cartes « guide » sans titre : rendues en simples notes, meme protection
+   que .card li contre un long jeton venu d'un plan importe. */
+#guidecards .note{overflow-wrap:anywhere}
 .version{font-size:11px; color:var(--dim); text-align:center; padding:16px 0 4px}
 .toast{position:fixed; bottom:calc(78px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line); color:var(--ink); border-radius:18px; padding:8px 16px; font-size:13.5px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:60; max-width:calc(100vw - 32px); white-space:normal; text-align:center; line-height:1.35}
 .toast.show{opacity:1}
-.hidden{display:none}
+/* `.hidden` doit TOUJOURS gagner : une regle posterieure qui fixe `display`
+   (ex. .backupnote{display:flex}) le rendait sans effet. */
+.hidden{display:none !important}
 /* Bandeau d'alerte PERSISTANT : perte de donnees silencieuse = signal qui reste
    affiche tant que le probleme dure (un toast de 1,8 s peut etre manque). */
 .savealert{position:sticky; top:0; z-index:35; background:rgba(224,168,62,.16); border-bottom:1px solid rgba(224,168,62,.45); padding:calc(9px + env(safe-area-inset-top)) 14px 11px; backdrop-filter:blur(8px)}
@@ -178,7 +196,7 @@ body.hasalert header{padding-top:14px}
 .today-card{display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:linear-gradient(120deg, rgba(255,107,53,.14), var(--panel) 60%); border:1px solid rgba(255,107,53,.4); border-radius:16px; padding:14px}
 .today-card .tc-ico{font-size:22px; flex:none}
 .today-card .tc-main{flex:1; min-width:0}
-.today-card .tc-title{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:19px; line-height:1.05}
+.today-card .tc-title{font-family:var(--disp); font-weight:700; text-transform:uppercase; font-size:19px; line-height:1.05; overflow-wrap:anywhere}
 .today-card .tc-sub{font-size:12.5px; color:var(--muted); margin-top:2px}
 .today-card .tc-go{font-size:20px; color:var(--orange); flex:none}
 .today-card .tc-real{font-size:12px; color:var(--moss); margin-top:4px; line-height:1.4}
@@ -206,7 +224,10 @@ body.hasalert header{padding-top:14px}
 .jentry .je-metric{font-size:12.5px; color:var(--moss)}
 .jentry .je-note{font-size:13px; color:var(--ink); margin-top:4px; opacity:.9; white-space:pre-wrap}
 .jentry .je-pains{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px}
-.pchip{font-size:11px; padding:2px 8px; border-radius:6px; background:rgba(224,168,62,.14); color:var(--amber)}
+/* Titre de seance (plan) et saisies du journal : un long jeton ne doit pas
+   elargir la page (meme protection que .card li). */
+.jentry .je-title, .jentry .je-metric, .jentry .je-note{overflow-wrap:anywhere}
+.pchip{font-size:11px; padding:2px 8px; border-radius:6px; background:rgba(224,168,62,.14); color:var(--amber); min-width:0; overflow-wrap:anywhere}
 /* Realise (Strava) dans la fiche de seance */
 .strava-line{font-size:14px; line-height:1.45; margin:0 0 6px; color:var(--ink)}
 .strava-line .sm{color:var(--muted); font-size:12.5px}
@@ -299,12 +320,12 @@ body.joining{overflow:hidden}
 </div>
 
 <header>
-  <div class="eyebrow" id="hdr-eyebrow">Objectif · perf + index UTMB</div>
-  <h1 id="hdr-title">L'Adonis Trail</h1>
-  <p class="sub" id="hdr-sub">26 km · 1121 m D+ · Roquefort-sur-Soulzon · dim. 6 déc · dossard pris ✓</p>
-  <div class="countdown"><b id="jj">J-–</b><span>avant la course</span></div>
-  <div class="progress" aria-hidden="true"><i id="progbar"></i></div>
-  <div class="progress-lbl" id="proglbl"></div>
+  <div class="eyebrow" id="hdr-eyebrow">Plan d'entraînement</div>
+  <h1 id="hdr-title">Entraînement</h1>
+  <p class="sub hidden" id="hdr-sub"></p>
+  <div class="countdown hidden" id="jjwrap"><b id="jj">J-–</b><span>avant la course</span></div>
+  <div class="progress hidden" id="progwrap" aria-hidden="true"><i id="progbar"></i></div>
+  <div class="progress-lbl hidden" id="proglbl"></div>
 </header>
 
 <!-- Rappel de sauvegarde. Ni alerte, ni compte a rebours : une ligne de fait,
@@ -319,8 +340,8 @@ body.joining{overflow:hidden}
 <section id="page-plan">
   <div class="todaywrap"><div class="lbl">Aujourd'hui</div><div id="todaycard"></div></div>
   <div class="profile" aria-label="Charge par semaine">
-    <svg id="loadsvg" viewBox="0 0 360 86" preserveAspectRatio="none" role="img" aria-label="Profil de charge : montée jusqu'à la semaine 5 puis affûtage"></svg>
-    <div class="profile-caption"><span>Reprise</span><span>Base</span><span>Backyard</span><span>Spécifique</span><span>Affûtage</span></div>
+    <svg id="loadsvg" viewBox="0 0 360 86" preserveAspectRatio="none" role="img" aria-label="Profil de charge par semaine"></svg>
+    <div class="profile-caption" id="loadcaption"></div>
   </div>
   <div class="wknav">
     <button class="arrow" id="prevwk" aria-label="Semaine précédente">‹</button>
@@ -351,62 +372,10 @@ body.joining{overflow:hidden}
     <thead><tr><th>Zone</th><th>Allure /km</th><th>FC</th></tr></thead>
     <tbody id="zonesbody"></tbody>
   </table>
-  <p class="note"><b>La FC commande</b> sur l'easy et le seuil (référence route ; le tapis fausse l'allure GPS). Le VO2 reste calé sur la VMA mesurée. En montée/descente : à l'effort, jamais au chrono.</p>
-  <p class="note">* <b>Zones provisoires.</b> Ton test VMA date d'octobre 2025 et tu sors de maladie. Le <b>test seuil du mardi 18 août</b> (20 min continu) recalibre tout : envoie allure + FC moyenne à Claude.</p>
-
-  <div class="card care">
-    <h3>⚠ Points de vigilance — blessures</h3>
-    <ul>
-      <li><b>Achille gauche</b> (feu orange) : RAS à plat, mais à surveiller sur la descente longue. Au 1er signal → footing plat/vélo, on ne force pas.</li>
-      <li><b>Malléole droite</b> : s'installe sur terrain irrégulier / dévers, indolore sur route. Limiter les longues descentes techniques enchaînées.</li>
-      <li><b>Essuie-glace (genou)</b> : pire en montée. Le renfo fessiers/stabilisateurs est ta prévention n°1 — on le garde.</li>
-      <li><b>Règle d'or gym</b> : zéro explosif (saltos, sauts) à moins de 72 h d'une sortie longue — c'est le déclencheur de l'Achille.</li>
-      <li>Décisions Achille + malléole → <b>médecin du sport</b>. Ce plan reste provisoire selon l'état post-Courchevel.</li>
-    </ul>
-  </div>
-
-  <div class="card care">
-    <h3>🎯 Discipline d'allure — ton chantier n°1</h3>
-    <ul>
-      <li><b>Le constat :</b> Grande Champagne (parti à 162 bpm, 2ᵉ moitié 38 % plus lente) et séance du 12 août (181-189 bpm au lieu de 165-170). Le schéma se répète : tu cours plus fort que prévu quand tu te sens bien.</li>
-      <li><b>Pourquoi ça compte pour l'Adonis :</b> 26 km avec 1121 m D+, si tu pars 10 bpm trop haut sur la première bosse, tu le paies sur le Combalou à la fin. Les places se perdent là.</li>
-      <li><b>La règle du bloc :</b> une séance easy réussie, c'est une séance où tu t'es ennuyé. Les jours faciles doivent être VRAIMENT faciles, sinon les jours durs ne servent à rien.</li>
-      <li><b>Nouvelle convention :</b> les fractions courtes (&lt; 3 min) sont pilotées à l'ALLURE (la FC n'a pas le temps de se stabiliser). Les efforts longs (seuil, sortie longue) sont pilotés à la FC.</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>🏋️ La muscu du bloc — comment ça marche</h3>
-    <ul>
-      <li><b>2 séances/semaine, toute la prépa</b> — jamais coupée sauf la dernière semaine. Séance A lourde le mercredi, séance B prévention le lundi.</li>
-      <li><b>Lourd et LENT, jamais explosif.</b> 4-6 répétitions à charge élevée, tempo contrôlé (3 s à la descente). Ça améliore l'économie de course et rigidifie le tendon — sans hypertrophie.</li>
-      <li><b>Les mollets en « heavy slow resistance »</b> (3 s / 3 s) : c'est à la fois du renfort de performance ET le protocole de référence pour ton Achille. Une pierre deux coups.</li>
-      <li><b>Zéro plyo / zéro salto</b> à moins de 72 h d'une sortie longue — et globalement on s'en passe sur ce bloc : c'est le déclencheur historique de ton Achille.</li>
-      <li><b>Séance B = assurance-vie :</b> proprioception cheville (malléole droite), fessiers/abducteurs (essuie-glace), mollets excentriques. 25 min, zéro fatigue.</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>⛰️ Montée &amp; descente : la philosophie</h3>
-    <ul>
-      <li><b>Montée = travail continu</b>, toutes les semaines du bloc (jeudi). C'est ton point faible identifié, et ça ne se règle pas en un « bloc » de 3 semaines : ça se construit en 4 mois. Format qui progresse : 45 s → 1 min → 2 min → 3 min → 5 min.</li>
-      <li><b>Descente = exposition progressive par blocs.</b> Là, l'approche « bloc » marche vraiment : les fibres s'adaptent aux contraintes excentriques et la protection acquise dure plusieurs semaines. D'où : exposition douce dès la S3, séances dédiées à partir de la S7, technique à partir de la S11, puis <b>dernière séance dure en S15</b> — 2 semaines pleines avant la course pour effacer la casse.</li>
-      <li><b>Pourquoi pas des blocs séparés stricts ?</b> Parce qu'isoler la montée puis la descente fait perdre l'un pendant qu'on travaille l'autre. On mène les deux en parallèle en déplaçant seulement l'accent.</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>Chaussures</h3>
-    <ul>
-      <li>Footings : Novablast 5 · Fractionné : Adidas Evo SL · Route : Vaporfly 2</li>
-      <li>Trail : pour ménager la malléole, privilégier les plus <b>souples / larges / drop bas</b> (Trabuco Max 2, drop 5) plutôt que les S/Lab Genesis (drop 8, plaque rigide) sur le dévers et les descentes techniques.</li>
-    </ul>
-  </div>
-
-  <p class="note"><b>À vérifier :</b> pointe à 215 bpm relevée le 12 août, au-dessus de ta FCmax connue (202). C'est probablement un artefact de ceinture, mais si ça se reproduit, garde-le en tête pour ton prochain contrôle médical.</p>
-  <p class="note">VMA 19 km/h (oct. 2025) · FCmax 202 · FC repos 43 · 66 kg · 10 km 35'17 · moteur aérobie fort, fort sur plat et en descente, point faible = montée.</p>
-  <p class="note"><b>Suivi sommeil :</b> renseigne « Sommeil (h) » et « FC repos matin » dans le ressenti de chaque séance, puis <b>Exporter</b> depuis l'onglet Journal et envoie le fichier à Claude. La FC de repos qui grimpe de 5-7 bpm plusieurs jours d'affilée = signal de surcharge avant même que les jambes parlent.</p>
-
+  <p class="note hidden" id="zonesempty">Les zones d'allure et de fréquence cardiaque viennent du plan : elles s'afficheront ici dès que ton plan en contiendra.</p>
+  <!-- Cartes de l'onglet Zones (champ « guide » du plan) : vigilance blessures,
+       reperes, materiel... Rendu en texte echappe, jamais d'HTML interprete. -->
+  <div id="guidecards"></div>
   <div class="card">
     <h3>🔄 Mettre à jour le plan</h3>
     <p class="note" id="planinfo" style="margin-top:0">Plan en cours de chargement…</p>
@@ -416,6 +385,8 @@ body.joining{overflow:hidden}
     <div class="note plan-msg hidden" id="planmsg"></div>
     <div class="hidden" id="planconfirm">
       <p class="note plan-msg" id="plansummary" style="color:var(--moss)"></p>
+      <!-- B6 : alerte sante = AMBRE (.plan-msg.err), jamais le vert du resume. -->
+      <p class="note plan-msg err hidden" id="planvigilance"></p>
       <div class="frow"><button class="btn ghost" id="plancancel" type="button">Annuler</button><button class="btn primary" id="planapply" type="button">Appliquer</button></div>
     </div>
     <p class="note">Tes coches, ton journal et tes courses ne sont jamais touchés par un changement de plan (ils sont indexés par date).</p>
@@ -538,6 +509,16 @@ const RENFO_NOTE = "Renfo = ton pilier anti-essuie-glace (fessiers, TFL, stabili
 let WEEKS = [];
 let ZONES = [];
 let SEED_RACES = [];
+/* CARTES DE L'ONGLET ZONES (champ « guide » du plan) et BOUTONS DE GENE du
+   journal (champ « genes »). Les deux sont FACULTATIFS dans un plan :
+     - pas de « guide » : l'onglet Zones n'affiche que le tableau des zones ;
+     - pas de « genes » : « RAS » + un seul bouton generique, la precision se
+       faisant dans la note de la seance.
+   Les identifiants de « genes » sont ce qui est ecrit dans tgcm-log : ils ne
+   doivent JAMAIS changer de sens d'un plan a l'autre (cf. painLabel). */
+let GUIDE = [];
+const DEFAULT_GENES = [{id:"gene", label:"Une gêne"}];
+let GENES = DEFAULT_GENES;
 
 let mem = {};
 /* readFailed[k] === true : la LECTURE de k a ECHOUE (storage indisponible, JSON
@@ -876,6 +857,18 @@ async function sdel(k){
   const efface = await rawDel(profileKey(k));
   let marque = false;
   try{ marque = await tombAdd(k); }catch(e){ marque = false; }
+  /* NON-PROPRIETAIRE PROUVE des anciennes cles : sget() ne consulte pour lui
+     ni le repli ni la pierre tombale -- la copie prefixee retiree, rien ne
+     peut revenir. Exiger la pierre tombale faisait annoncer « réapparaîtra
+     au prochain lancement » a tort (stockage plein). La preuve est RELUE :
+     un « non » de session faute d'avoir su lire la marque ne suffit pas, un
+     lancement suivant pourrait trancher « oui ». Chez le proprietaire (Enzo),
+     rien ne change : la pierre tombale reste exigee. */
+  if(efface && !marque && LEGACY_OWNER !== true){
+    let ev = {value:false, known:false};
+    try{ ev = await legacyOwnerEvidence(); }catch(e){ ev = {value:false, known:false}; }
+    if(ev.known === true && ev.value === false) return true;
+  }
   return efface && marque;
 }
 
@@ -1311,9 +1304,48 @@ function brokenKeysLabel(){
   if(l.length === 1) return l[0];
   return l.slice(0, -1).join(", ") + " et " + l[l.length-1];
 }
-let SAVE_FAILED = false;      // derniere ecriture de donnees utilisateur en echec
+/* ETAT D'ECRITURE, SUIVI PAR CLE (defaut D2).
+   Un echec ne se leve QUE par le succes de LA MEME cle : sset() ecrit
+   l'objet ENTIER d'une cle, donc un succes rattrape tout ce qui etait en
+   attente POUR CETTE CLE -- et ne prouve RIEN sur les deux autres. Le
+   bandeau #savealert restait auparavant a la merci de la premiere ecriture
+   reussie venue : le journal refuse par le stockage disparaissait de l'ecran
+   des qu'une coche passait. */
+let SAVE_FAILED = false;      // recalcule : une ecriture en echec n'est toujours pas levee
+let writeFailed = {};         // cle utilisateur (ou "plan-override") -> sa derniere ecriture a echoue
+let probeFailed = false;      // la sonde d'ecriture (cle jetable) a echoue
 let READ_BROKEN = false;      // au moins une cle tgcm-* n'a PAS pu etre lue
-let unsavedDays = {};         // dates ISO modifiees mais non persistees
+let unsavedDays = {};         // date ISO -> { cle utilisateur en attente: true }
+/* Le plan importe (`plan-override`) suit la MEME regle que les trois cles :
+   un echec d'ecriture leve le bandeau, et seul un succes de CETTE cle (ou son
+   retrait enregistre) le leve. Sans cela, un plan affiche puis perdu au
+   lancement suivant ne laissait qu'un toast. */
+function refreshSaveFailed(){
+  SAVE_FAILED = probeFailed || !!writeFailed["plan-override"]
+    || USER_KEYS.some(function(k){ return !!writeFailed[k]; });
+}
+/* Jour affiche « non enregistre » : on retient POUR QUELLE CLE, sinon le
+   succes d'une autre cle effacerait la marque d'un jour toujours en attente. */
+function markUnsaved(k, iso){
+  if(!iso) return;
+  if(!isPlainObject(unsavedDays[iso])) unsavedDays[iso] = {};
+  unsavedDays[iso][k] = true;
+}
+function clearUnsaved(k){
+  Object.keys(unsavedDays).forEach(function(iso){
+    const e = unsavedDays[iso];
+    if(!isPlainObject(e)){ delete unsavedDays[iso]; return; }
+    delete e[k];
+    if(!Object.keys(e).length) delete unsavedDays[iso];
+  });
+}
+/* Resultat d'une ecriture de cle utilisateur. Un succes leve l'echec de CETTE
+   cle -- et celui de la sonde, qu'une ecriture reelle vient de dementir. */
+function noteWrite(k, ok){
+  if(ok){ delete writeFailed[k]; clearUnsaved(k); probeFailed = false; }
+  else writeFailed[k] = true;
+  refreshSaveFailed();
+}
 const SAVE_TOAST = "⚠ Non enregistré — stockage plein.";
 function saveFailMsg(prefix, key){
   if(key && readFailed[key]){
@@ -1356,7 +1388,7 @@ async function saveUser(k, v, iso, force){
   // Cause racine : on n'ecrase JAMAIS une cle dont la lecture a echoue par ce
   // qu'on a en memoire — ce serait detruire l'historique qu'on n'a pas su lire.
   if(!force && readFailed[k]){
-    if(iso) unsavedDays[iso] = true;
+    markUnsaved(k, iso);
     READ_BROKEN = true;
     renderSaveBanner();
     return false;
@@ -1367,28 +1399,26 @@ async function saveUser(k, v, iso, force){
       delete readFailed[k];
       READ_BROKEN = USER_KEYS.some(function(x){ return !!readFailed[x]; });
     }
-    // sset ecrit l'objet ENTIER : un succes rattrape tout ce qui etait en attente.
-    unsavedDays = {};
-    SAVE_FAILED = false;
-    renderSaveBanner();
   } else {
-    if(iso) unsavedDays[iso] = true;
-    SAVE_FAILED = true;
-    renderSaveBanner();
+    markUnsaved(k, iso);
   }
+  // sset ecrit l'objet ENTIER : un succes rattrape ce qui etait en attente
+  // POUR CETTE CLE, jamais pour les autres.
+  noteWrite(k, ok);
+  renderSaveBanner();
   return ok;
 }
 /* Sonde d'ecriture sur une cle JETABLE : elle ne doit jamais toucher
    tgcm-done / tgcm-log / tgcm-races. Nettoyee immediatement apres. */
 async function storageProbe(){
   const ok = await sset("tgcm-probe", 1);
-  if(ok){
-    try{ await sdel("tgcm-probe"); }catch(e){}
-    if(SAVE_FAILED){ SAVE_FAILED = false; renderSaveBanner(); }
-  } else {
-    SAVE_FAILED = true;
-    renderSaveBanner();
-  }
+  /* La sonde ne parle que d'elle-meme : reussir a ecrire un octet jetable ne
+     prouve rien sur un journal de 200 ko deja refuse. Elle ne leve donc
+     JAMAIS l'echec d'une cle utilisateur (writeFailed). */
+  probeFailed = !ok;
+  refreshSaveFailed();
+  if(ok){ try{ await sdel("tgcm-probe"); }catch(e){} }
+  renderSaveBanner();
   return ok;
 }
 
@@ -1618,8 +1648,21 @@ const $ = id => document.getElementById(id);
 const TYPE_LABEL = {off:"Repos", easy:"Endurance", qual:"Qualité", renfo:"Renfo", long:"Sortie longue", race:"Course"};
 const FEELS = [["good","👍 Bien"],["ok","😐 Bof"],["hard","🥵 Dur"]];
 const FEEL_EMO = {good:"👍", ok:"😐", hard:"🥵"};
-const PAINS = [["ras","RAS"],["achille","Achille G"],["malleole","Malléole D"],["genou","Genou"]];
-const PAIN_LABEL = {achille:"Achille G", malleole:"Malléole D", genou:"Genou", ras:"RAS"};
+/* « RAS » est TOUJOURS gere par l'app : il n'est pas declare dans le plan. */
+function painButtons(){
+  return [["ras","RAS"]].concat(arr(GENES).map(function(g){ return [g.id, g.label]; }));
+}
+/* Une entree de journal ancienne peut porter une gene que le plan courant ne
+   declare plus : on affiche alors l'identifiant brut, jamais « undefined ». */
+/* L'id generique `gene` (« Une gêne ») garde son libelle meme quand le plan
+   courant declare sa propre liste sans lui : une gene signalee avec l'ancien
+   plan ne doit pas devenir « ⚠ gene » dans l'historique. Un libelle declare
+   par le plan reste prioritaire. Les BOUTONS proposes ne changent pas. */
+function painLabel(id){
+  const g = arr(GENES).concat(DEFAULT_GENES).filter(function(x){ return x && x.id===id; })[0];
+  if(g) return g.label;
+  return (id==="ras") ? "RAS" : String(id);
+}
 const DAY_ICO = {race:"🏁", off:"🌙", renfo:"🏋️", qual:"🔥", long:"🥾", easy:"👟"};
 /* INVARIANT 1 : le km hebdo est TOUJOURS la somme des km des seances.
    Ne jamais lire un champ `km` declare au niveau de la semaine. */
@@ -1707,8 +1750,11 @@ function validatePlan(obj){
   }
   if(!Number.isInteger(obj.version)) push("Champ « version » manquant ou non entier (reçu : "+JSON.stringify(obj.version)+").");
   if(obj.updated!==undefined && typeof obj.updated!=="string") push("Champ « updated » : chaîne attendue (ex. \"2026-08-13\").");
-  if(!Array.isArray(obj.weeks) || obj.weeks.length===0){
-    push("Champ « weeks » : tableau non vide attendu.");
+  /* UN PLAN SANS SEMAINE EST VALIDE ICI : c'est l'etat de depart de plan.json
+     (version 0, aucune semaine), et ce n'est pas une erreur reseau. L'IMPORT,
+     lui, est plus strict et le refuse — cf. importRefus(). */
+  if(!Array.isArray(obj.weeks)){
+    push("Champ « weeks » : tableau attendu.");
     return {ok:false, errors:errors, summary:planStats(obj)};
   }
 
@@ -1767,6 +1813,35 @@ function validatePlan(obj){
   if(obj.race!==undefined){
     if(!isPlainObject(obj.race)) push("Champ « race » : objet attendu.");
     else if(!isISODate(obj.race.date)) push("race.date : date "+JSON.stringify(obj.race.date)+" invalide (AAAA-MM-JJ).");
+  }
+  // Cartes de l'onglet Zones. Facultatif, mais refuse si mal forme.
+  if(obj.guide!==undefined){
+    if(!Array.isArray(obj.guide)) push("Champ « guide » : tableau attendu (cartes de l'onglet Zones).");
+    else obj.guide.forEach(function(c, i){
+      const nm = "guide n°"+(i+1)+((isPlainObject(c) && typeof c.title==="string" && c.title) ? " ("+c.title+")" : "");
+      if(!isPlainObject(c)){ push(nm+" : objet attendu { title, care, items }."); return; }
+      if(c.title!==undefined && typeof c.title!=="string") push(nm+" : « title » doit être du texte.");
+      if(c.care!==undefined && typeof c.care!=="boolean") push(nm+" : « care » doit valoir true ou false.");
+      if(!Array.isArray(c.items) || c.items.length===0) push(nm+" : « items » doit être un tableau non vide de lignes de texte.");
+      else if(c.items.some(function(x){ return typeof x!=="string" || !x.trim(); })) push(nm+" : « items » contient une valeur qui n'est pas du texte.");
+    });
+  }
+  // Boutons de gene du journal. L'id est stocke dans tgcm-log : chaine stable,
+  // unique, et jamais « ras » (reserve a l'app).
+  if(obj.genes!==undefined){
+    if(!Array.isArray(obj.genes)) push("Champ « genes » : tableau attendu (boutons de gêne du journal).");
+    else {
+      const vus = Object.create(null);
+      obj.genes.forEach(function(g, i){
+        const nm = "genes n°"+(i+1)+((isPlainObject(g) && typeof g.id==="string" && g.id) ? " ("+g.id+")" : "");
+        if(!isPlainObject(g)){ push(nm+" : objet attendu { id, label }."); return; }
+        if(typeof g.id!=="string" || !g.id.trim()) push(nm+" : champ « id » manquant (identifiant stable, enregistré dans le journal).");
+        else if(g.id==="ras") push(nm+" : l'identifiant « ras » est réservé à l'app.");
+        else if(vus[g.id]) push(nm+" : identifiant « "+g.id+" » en double.");
+        else vus[g.id] = true;
+        if(typeof g.label!=="string" || !g.label.trim()) push(nm+" : champ « label » manquant.");
+      });
+    }
   }
 
   return {ok: errors.length===0, errors: errors, summary: planStats(obj)};
@@ -1830,6 +1905,9 @@ function applyRaceMeta(){
   // seul le compte a rebours est neutralise.
   const dj = RACE_DAY ? daysTo(RACE_DAY) : null;
   $("jj").textContent = (dj===null) ? "J-–" : (dj>0 ? "J-"+dj : (dj===0 ? "JOUR J" : "Finie !"));
+  // Aucune date d'objectif : le compte a rebours n'a rien a compter, on le
+  // cache plutot que d'afficher « J-– avant la course ».
+  const jw = $("jjwrap"); if(jw) jw.classList.toggle("hidden", dj===null);
 }
 /* Seul point d'entree pour installer un plan en memoire. */
 function applyPlan(plan, source, cached){
@@ -1842,12 +1920,16 @@ function applyPlan(plan, source, cached){
   WEEKS = arr(plan && plan.weeks);
   ZONES = arr(plan && plan.zones);
   SEED_RACES = arr(plan && plan.races);
+  GUIDE = arr(plan && plan.guide);
+  GENES = planGenes(plan);
   const m = raceMeta();
   RACE_DAY = m ? m.date : "";
   applyRaceMeta();
 }
 function planProvenance(){
-  if(PLAN_SOURCE==="override") return "plan importé";
+  // Ecriture du plan importe refusee dans cette session : il est affiche mais
+  // ne sera pas relu au prochain lancement. On ne le presente pas comme acquis.
+  if(PLAN_SOURCE==="override") return writeFailed["plan-override"] ? "plan importé, NON enregistré sur cet appareil" : "plan importé";
   if(PLAN_CACHED && PLAN_MEMORY_ONLY) return "plan par défaut (hors-ligne, en mémoire seulement)";
   return PLAN_CACHED ? "plan par défaut (cache hors-ligne)" : "plan par défaut";
 }
@@ -1856,14 +1938,14 @@ function renderVersionLine(){
   if(!PLAN){ el.textContent = PLAN_NONE_TEXT || "Plan indisponible — vérifie ta connexion."; return; }
   const s = planStats(PLAN);
   el.textContent = "Plan v"+PLAN.version+" · "+(s.updated ? "mis à jour le "+frNum(s.updated) : "date inconnue")
-    + " · " + planProvenance() + " · " + s.weeks + " semaines ("+frNum(s.start)+" → "+frNum(s.end)+")";
+    + " · " + planProvenance() + " · " + (s.weeks ? (s.weeks+" semaines ("+frNum(s.start)+" → "+frNum(s.end)+")") : "aucune semaine");
 }
 function renderPlanCard(){
   const el = $("planinfo"); if(!el) return;
   if(!PLAN){ el.textContent = "Aucun plan actif sur cet appareil. Colle un JSON de plan ci-dessous pour démarrer."; return; }
   const s = planStats(PLAN);
   let txt = "Plan actif : v"+PLAN.version+" · "+(s.updated ? "mis à jour le "+frNum(s.updated) : "date inconnue")
-    + " · " + planProvenance() + " · " + s.weeks + " semaines · " + s.days + " jours (du "+frNum(s.start)+" au "+frNum(s.end)+").";
+    + " · " + planProvenance() + " · " + (s.weeks ? (s.weeks+" semaines · "+s.days+" jours (du "+frNum(s.start)+" au "+frNum(s.end)+")") : "aucune semaine") + ".";
   // B15 : un override ecarte pour version inferieure doit etre signale, sinon
   // Enzo peut croire son import perdu (il est conserve, juste pas applique).
   if(PLAN_PENDING_OVERRIDE){
@@ -1872,10 +1954,40 @@ function renderPlanCard(){
   }
   el.textContent = txt;
 }
+/* Pas de « genes » dans le plan : un seul bouton generique, la precision se
+   fait dans la note. On ne devine pas les blessures de quelqu'un. */
+function planGenes(plan){
+  const g = arr(plan && plan.genes).filter(function(x){
+    return isPlainObject(x) && typeof x.id==="string" && x.id && typeof x.label==="string" && x.label;
+  });
+  return g.length ? g : DEFAULT_GENES;
+}
 function renderZones(){
   $("zonesbody").innerHTML = arr(ZONES).map(function(z){
     const c = arr(z);
     return '<tr><td>'+esc(c[0])+'</td><td><b>'+esc(c[1])+'</b></td><td><b>'+esc(c[2])+'</b></td></tr>';
+  }).join("");
+  const e = $("zonesempty");
+  if(e) e.classList.toggle("hidden", arr(ZONES).length>0);
+}
+/* CARTES DE L'ONGLET ZONES. Tout est rendu par esc() : le plan est du TEXTE,
+   jamais du HTML — un plan importe ne doit pas pouvoir injecter de balise.
+   Une carte care:true porte le style d'alerte ambre (.card.care) : c'est le
+   rendu des sections « Vigilance », que rien ne doit masquer (CLAUDE.md). */
+function renderGuide(){
+  const el = $("guidecards"); if(!el) return;
+  el.innerHTML = arr(GUIDE).map(function(c){
+    if(!isPlainObject(c)) return "";
+    const items = arr(c.items).filter(function(t){ return typeof t==="string" && t.trim(); });
+    const title = (typeof c.title==="string" && c.title.trim()) ? c.title : "";
+    const care  = (c.care===true);
+    // Sans titre et sans alerte : de simples notes, comme les paragraphes
+    // « note » qui vivaient jusqu'ici en dur dans cet onglet.
+    if(!title && !care) return items.map(function(t){ return '<p class="note">'+esc(t)+'</p>'; }).join("");
+    return '<div class="card'+(care?' care':'')+'">'
+      + (title ? '<h3>'+esc(title)+'</h3>' : '')
+      + (items.length ? '<ul>'+items.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join("")+'</ul>' : '')
+      + '</div>';
   }).join("");
 }
 
@@ -2048,7 +2160,7 @@ function showPlanError(detail, text){
 function planLoadingState(){
   PLAN = null; PLAN_SOURCE = ""; PLAN_CACHED = false; PLAN_MEMORY_ONLY = false; PLAN_PENDING_OVERRIDE = null;
   PLAN_NONE_TEXT = "Chargement du plan…";
-  WEEKS = []; ZONES = []; SEED_RACES = []; RACE_DAY = "";
+  WEEKS = []; ZONES = []; SEED_RACES = []; RACE_DAY = ""; GUIDE = []; GENES = DEFAULT_GENES;
   try{ applyRaceMeta(); }catch(e){}
   try{ renderAll(); }catch(e){}
   try{
@@ -2060,10 +2172,38 @@ function planLoadingState(){
     $("todaycard").innerHTML = '<div class="today-card restday"><span class="tc-ico">⏳</span><div class="tc-main"><div class="tc-title">Chargement du plan…</div></div></div>';
   }catch(e){}
 }
+/* PLAN SANS SEMAINE (plan.json de demarrage, ou plan vide importe autrefois).
+   Ce n'est PAS une erreur reseau : on ne dit pas « vérifie ta connexion ». */
+const NOPLAN_TITLE = "Pas encore de plan sur cet appareil";
+const NOPLAN_TEXT  = "Demande le kit coach à Enzo, construis ton plan avec Claude, puis importe-le : onglet Zones › « Mettre à jour le plan ».";
+function showNoWeeks(){
+  try{
+    $("days").innerHTML = '<div class="card"><h3>'+esc(NOPLAN_TITLE)+'</h3>'
+      + '<p class="note" style="margin-top:0">'+esc(NOPLAN_TEXT)+'</p></div>';
+    $("wktitle").textContent = "—";
+    $("wkmeta").textContent = "Aucune semaine dans ce plan";
+    $("prevwk").disabled = true; $("nextwk").disabled = true;
+  }catch(e){}
+  showNoWeeksToday();
+}
+/* B1 : la carte du JOUR quand il n'y a aucune semaine. Rendue a part parce que
+   renderToday() est aussi appele SEUL (stravaRerender : cle d'appareil
+   enregistree, synchro, « Déconnecter »), sans passer par le garde de
+   renderAll(). Sans ca, quelqu'un qui n'a jamais eu de plan lisait
+   « Plan terminé — bravo ! », et jusqu'au rechargement. */
+function showNoWeeksToday(){
+  try{
+    // Les faits Strava du jour restent affiches : ils ne dependent pas du plan
+    // (et ne sont compares a rien, faute de seance prevue).
+    let sv = ""; try{ sv = stravaTodayHTML(todayISO(), null); }catch(e){ sv = ""; }
+    $("todaycard").innerHTML = '<div class="today-card restday"><span class="tc-ico">🧭</span><div class="tc-main">'
+      + '<div class="tc-title">'+esc(NOPLAN_TITLE)+'</div><div class="tc-sub">'+esc(NOPLAN_TEXT)+'</div>'+sv+'</div></div>';
+  }catch(e){}
+}
 function renderAll(){
-  renderZones(); renderRaces(); renderJournal(); renderProgress();
+  renderZones(); renderGuide(); renderRaces(); renderJournal(); renderProgress();
   renderVersionLine(); renderPlanCard();
-  if(!WEEKS.length) return;
+  if(!WEEKS.length){ drawProfile(); if(PLAN) showNoWeeks(); return; }
   const t = todayISO();
   let idx = WEEKS.findIndex(function(w){
     const ds = arr(w && w.days);
@@ -2080,7 +2220,7 @@ function renderAll(){
 function failToPlanError(detail, text){
   PLAN = null; PLAN_SOURCE = ""; PLAN_CACHED = false; PLAN_MEMORY_ONLY = false; PLAN_PENDING_OVERRIDE = null;
   PLAN_NONE_TEXT = text ? String(text) : "";
-  WEEKS = []; ZONES = []; SEED_RACES = []; RACE_DAY = "";
+  WEEKS = []; ZONES = []; SEED_RACES = []; RACE_DAY = ""; GUIDE = []; GENES = DEFAULT_GENES;
   try{ applyRaceMeta(); }catch(e){}
   try{ renderAll(); }catch(e){}
   try{ showPlanError(detail, text); }catch(e){
@@ -2130,7 +2270,30 @@ async function reloadPlan(notify){
   return true;
 }
 
+/* Legende du profil de charge : les phases du plan, dans l'ordre des semaines,
+   sans doublon. Jamais de phases codees en dur, et RIEN d'invente : le champ
+   « phase » peut aussi bien porter un nom de bloc qu'une prose hebdomadaire. */
+function planPhases(){
+  const out=[];
+  WEEKS.forEach(function(w){
+    const p = (w && typeof w.phase==="string") ? w.phase.trim() : "";
+    if(p && out.indexOf(p)<0) out.push(p);
+  });
+  return out;
+}
+function drawCaption(){
+  const el = $("loadcaption"); if(!el) return;
+  const ph = WEEKS.length ? planPhases() : [];
+  /* B5 : une legende n'est DERIVABLE que s'il y a 2 a 6 phases distinctes.
+     0 ou 1 : rien a legender. Plus de 6 (plan d'Enzo : 15 proses
+     hebdomadaires) : ce ne sont pas des noms de bloc. Dans ces cas on ne
+     rend AUCUN element -- un bandeau vide prendrait de la place pour rien. */
+  const ok = ph.length >= 2 && ph.length <= 6;
+  el.innerHTML = ok ? ph.map(function(p){ return '<span>'+esc(p)+'</span>'; }).join("") : "";
+  el.classList.toggle("hidden", !ok);
+}
 function drawProfile(){
+  drawCaption();
   if(!WEEKS.length){ $("loadsvg").innerHTML=""; return; }
   const kms = WEEKS.map(weekKm), max = Math.max.apply(null, kms) || 1;
   const W=360, H=86, pad=14, bw=(W-pad*2)/WEEKS.length;
@@ -2223,7 +2386,8 @@ function journalEditorHTML(day){
   const e = log[day.d] || {};
   const feel = '<div class="pick">'+FEELS.map(f=>'<button type="button" data-feel="'+f[0]+'" class="'+(e.feel===f[0]?'on':'')+'">'+f[1]+'</button>').join('')+'</div>';
   const pains = arr(e.pain);
-  const pain = '<div class="pick pain">'+PAINS.map(p=>'<button type="button" data-pain="'+p[0]+'" class="'+(p[0]==='ras'?'ras ':'')+(pains.indexOf(p[0])>-1?'on':'')+'">'+p[1]+'</button>').join('')+'</div>';
+  // Identifiant ET libelle viennent du plan : tous deux echappes, comme le reste.
+  const pain = '<div class="pick pain">'+painButtons().map(p=>'<button type="button" data-pain="'+escAttr(p[0])+'" class="'+(p[0]==='ras'?'ras ':'')+(pains.indexOf(p[0])>-1?'on':'')+'">'+esc(p[1])+'</button>').join('')+'</div>';
   return '<div class="jnl"><h3>Mon ressenti</h3>'
     + '<div class="lab">Sensation</div>'+feel
     + '<div class="lab">Allure / FC réelle tenue</div><input id="jmetric" placeholder="ex : 3:48/km @ 184 bpm" value="'+escAttr(e.metric)+'">'
@@ -2266,8 +2430,21 @@ function bindJournalEditor(day){
   if(rh) rh.addEventListener('change', async function(){ cur().rhr=rh.value.trim(); await persist(); });
 }
 function allSessions(){ let t=0,d=0; WEEKS.forEach(function(w){ arr(w && w.days).forEach(function(x){ if(x && x.t!=='off'){ t++; if(isDone(x.d)) d++; } }); }); return {t:t,d:d}; }
-function renderProgress(){ const s=allSessions(); const pct=s.t?Math.round(s.d/s.t*100):0; $("progbar").style.width=pct+"%"; $("proglbl").textContent=s.d+" / "+s.t+" séances · "+pct+"%"; }
+function renderProgress(){
+  const s=allSessions(); const pct=s.t?Math.round(s.d/s.t*100):0;
+  $("progbar").style.width=pct+"%";
+  $("proglbl").textContent = s.t ? (s.d+" / "+s.t+" séances · "+pct+"%") : "";
+  // Aucune seance au plan : ni barre, ni « 0 / 0 séances ».
+  const w=$("progwrap"); if(w) w.classList.toggle("hidden", !s.t);
+  $("proglbl").classList.toggle("hidden", !s.t);
+}
 function renderToday(){
+  /* B1 : AUCUNE SEMAINE = pas de plan du tout, jamais « Plan terminé ». Le
+     garde vit ICI et pas seulement dans renderAll(), parce que renderToday()
+     a des appelants qui l'invoquent seul (stravaRerender). PLAN absent
+     (erreur reseau, ou chargement en cours) : showPlanError / la vue de
+     chargement ont deja ecrit la carte du jour, on ne l'ecrase pas. */
+  if(!WEEKS.length){ if(PLAN) showNoWeeksToday(); return; }
   const iso=todayISO(); const day=findDay(iso); const el=$("todaycard");
   if(!day){
     let nxt=null; for(const w of WEEKS){ for(const dd of arr(w && w.days)){ if(dd && dd.d>iso && dd.t!=='off'){ nxt=dd; break; } } if(nxt) break; }
@@ -2292,7 +2469,7 @@ function renderJournal(){
     const e=log[k]; const day=findDay(k);
     const pains=arr(e.pain).filter(function(p){return p!=='ras';});
     const isPain=pains.length>0;
-    let ptags=pains.map(function(p){return '<span class="pchip">⚠ '+PAIN_LABEL[p]+'</span>';}).join('');
+    let ptags=pains.map(function(p){return '<span class="pchip">⚠ '+esc(painLabel(p))+'</span>';}).join('');
     if(arr(e.pain).indexOf('ras')>-1) ptags='<span class="pchip" style="background:var(--moss-soft);color:var(--moss)">RAS</span>';
     return '<div class="jentry'+(isPain?' pain':'')+'"><div class="je-top"><span class="je-date">'+frDate(k)+' '+k.slice(0,4)+'</span><span class="je-feel">'+(e.feel?FEEL_EMO[e.feel]:'')+'</span></div>'
       +'<div class="je-title">'+(day?esc(day.title):'Séance')+'</div>'
@@ -2350,11 +2527,15 @@ $("raceform").addEventListener("submit", async e=>{
    ====================================================================== */
 let ASK_READY = false;      // les boutons ont-ils pu etre cables ?
 let askSettle = null;       // resolveur de la modale en cours
+let askState = null;        // objet du demandeur, ou l'on note la CAUSE de la fermeture
 let askPrevFocus = null;    // element a re-focaliser a la fermeture
 
-function askClose(result){
-  const settle = askSettle;
-  askSettle = null;
+function askClose(result, cause){
+  const settle = askSettle, state = askState;
+  askSettle = null; askState = null;
+  // La cause n'est renseignee que pour les fermetures qui ne viennent pas
+  // d'Enzo (pour l'instant : une seconde modale qui prend la place).
+  if(state && cause) state.cause = cause;
   try{
     $("askoverlay").classList.remove("open");
     $("ask").classList.remove("open");
@@ -2389,7 +2570,7 @@ function askConfirm(opt){
     const settle = function(v){ if(done) return; done = true; resolve(v === true); };
     try{
       if(!ASK_READY){ settle(false); return; }              // cablage impossible -> annulation
-      if(askSettle) askClose(false);                        // jamais deux modales empilees
+      if(askSettle) askClose(false, "superseded");          // jamais deux modales empilees
       const ov = $("askoverlay"), box = $("ask"), ttl = $("asktitle"),
             body = $("askbody"), ok = $("askok"), no = $("askcancel");
       if(!ov || !box || !ttl || !body || !ok || !no){ settle(false); return; } // affichage impossible -> annulation
@@ -2406,6 +2587,7 @@ function askConfirm(opt){
       no.textContent = (opt && opt.cancelLabel) || "Annuler";
       ok.className = "btn " + ((opt && opt.danger) ? "danger" : "primary");
       askSettle = settle;
+      askState = (opt && isPlainObject(opt.state)) ? opt.state : null;
       askPrevFocus = document.activeElement;
       box.setAttribute("aria-hidden", "false");
       ov.classList.add("open");
@@ -2435,7 +2617,78 @@ function planMsg(text, cls){
   el.className = "note plan-msg" + (cls ? " "+cls : "") + (text ? "" : " hidden");
   el.textContent = text || "";
 }
-function hidePlanConfirm(){ pendingPlan = null; $("planconfirm").classList.add("hidden"); }
+function hidePlanConfirm(){ pendingPlan = null; $("planconfirm").classList.add("hidden"); planVigilance(""); }
+/* B6 : element PROPRE, en ambre. Concatene dans #plansummary, l'avertissement
+   heritait du vert de « Plan valide. » -- CLAUDE.md reserve l'ambre aux
+   alertes sante, et une alerte en vert ne se lit pas comme une alerte. */
+function planVigilance(text){
+  const el = $("planvigilance"); if(!el) return;
+  el.textContent = text || "";
+  el.classList.toggle("hidden", !text);
+}
+
+/* REGLE PROPRE A L'IMPORT, plus stricte que validatePlan : un plan sans
+   semaine est VALIDE pour l'app (c'est l'etat de depart de plan.json), mais
+   l'importer remplacerait le plan affiche par rien. Rend "" si l'import est
+   acceptable, sinon le motif de refus. */
+function importRefus(p){
+  if(arr(p && p.weeks).length===0)
+    return "Plan refusé : ce plan ne contient aucune semaine.\nUn plan importé doit contenir au moins une semaine de séances.";
+  return "";
+}
+/* GARDE-FOU VIGILANCE (CLAUDE.md : ne jamais faire disparaitre en silence un
+   avertissement de securite). Compare les cartes care:true du plan ACTIF a
+   celles du plan propose, par titre. Enzo garde la main : on l'informe avant
+   « Appliquer », on ne bloque pas. */
+function careCards(p){
+  return arr(p && p.guide)
+    .filter(function(c){ return isPlainObject(c) && c.care===true; })
+    .map(function(c){
+      return {
+        title: (typeof c.title==="string" && c.title.trim()) ? c.title.trim() : "(carte sans titre)",
+        items: arr(c.items).filter(function(t){ return typeof t==="string" && t.trim(); })
+                           .map(function(t){ return t.trim(); })
+      };
+    });
+}
+function careTitles(p){ return careCards(p).map(function(c){ return c.title; }); }
+/* Trois angles morts d'une comparaison par titres DISTINCTS :
+   - deux cartes homonymes, une retiree : le titre survit, la carte non ;
+   - carte conservee sous le meme titre mais VIDEE de ses items ;
+   - carte (souvent sans titre) dont le contenu est integralement remplace.
+   D'ou : appariement en MULTIENSEMBLE (chaque carte actuelle consomme UNE
+   carte proposee), puis comparaison du contenu des cartes appariees.
+   Aucun blocage : on informe avant « Appliquer », Enzo garde la main. */
+function vigilanceWarning(next){
+  const cur = careCards(PLAN), nx = careCards(next);
+  const libres = {};
+  nx.forEach(function(c){ (libres[c.title] = libres[c.title] || []).push(c); });
+  const perdus = [], vides = [], remplaces = [];
+  cur.forEach(function(a){
+    const dispo = libres[a.title];
+    if(!dispo || !dispo.length){ perdus.push(a.title); return; }
+    const b = dispo.shift();                       // appariee : plus reutilisable
+    if(!a.items.length) return;                    // rien a perdre cote contenu
+    if(!b.items.length){ vides.push(a.title); return; }
+    if(!b.items.some(function(t){ return a.items.indexOf(t) > -1; })) remplaces.push(a.title);
+  });
+  const out = [];
+  function bloc(liste, un, plusieurs){
+    if(!liste.length) return;
+    out.push(liste.length > 1 ? plusieurs.replace("{n}", liste.length) : un);
+    liste.forEach(function(t){ out.push("• "+t); });
+  }
+  bloc(perdus,
+    "⚠ Ce plan ne contient pas la carte de vigilance du plan actuel : elle disparaîtra.",
+    "⚠ Ce plan ne contient pas les {n} cartes de vigilance du plan actuel : elles disparaîtront.");
+  bloc(vides,
+    "⚠ Une carte de vigilance est conservée mais vidée de tout son contenu :",
+    "⚠ {n} cartes de vigilance sont conservées mais vidées de tout leur contenu :");
+  bloc(remplaces,
+    "⚠ Une carte de vigilance garde son titre mais son contenu est entièrement remplacé :",
+    "⚠ {n} cartes de vigilance gardent leur titre mais leur contenu est entièrement remplacé :");
+  return out.join("\n");
+}
 
 $("planvalidate").addEventListener("click", function(){
   hidePlanConfirm();
@@ -2454,11 +2707,18 @@ $("planvalidate").addEventListener("click", function(){
     planMsg("Plan refusé — "+v.errors.length+" erreur"+(v.errors.length>1?"s":"")+" :\n"+formatErrors(v.errors), "err");
     return;
   }
+  const refus = importRefus(obj);
+  if(refus){
+    toast("Plan refusé ✗");
+    planMsg(refus, "err");
+    return;
+  }
   pendingPlan = obj;
   const s = v.summary;
   planMsg("Plan valide.", "ok");
   $("plansummary").textContent = "v"+s.version+" · "+s.weeks+" semaines · "+s.days+" jours · du "
     + frNum(s.start)+" au "+frNum(s.end)+" — appliquer ?";
+  planVigilance(vigilanceWarning(obj));
   $("planconfirm").classList.remove("hidden");
 });
 
@@ -2471,12 +2731,19 @@ $("planapply").addEventListener("click", async function(){
   if(!pendingPlan) return;
   const v = safeValid(pendingPlan);
   if(!v.ok){ toast("Plan refusé ✗"); planMsg("Plan refusé :\n"+formatErrors(v.errors), "err"); hidePlanConfirm(); return; }
+  const refus2 = importRefus(pendingPlan);
+  if(refus2){ toast("Plan refusé ✗"); planMsg(refus2, "err"); hidePlanConfirm(); return; }
   const p = pendingPlan;
   hidePlanConfirm();
   // B8 : ne jamais annoncer un succes si rien n'a ete persiste.
   const saved = await sset("plan-override", p);
   applyPlan(p, "override");
   PLAN_PENDING_OVERRIDE = null;
+  // Meme suivi que l'import de sauvegarde : un echec leve le bandeau, un
+  // succes leve un echec anterieur du plan (et lui seul).
+  noteWrite("plan-override", saved === true);
+  if(saved === true) delete readFailed["plan-override"];   // contenu enregistre desormais connu
+  renderSaveBanner();
   $("planbox").value = "";
   renderAll();
   if(saved){
@@ -2491,13 +2758,26 @@ $("planapply").addEventListener("click", async function(){
 });
 
 $("planreset").addEventListener("click", async function(){
+  /* Le plan par defaut peut ne contenir AUCUNE semaine (plan.json de
+     demarrage) : le dire avant, sinon la confirmation promet un plan qui
+     n'existe pas. On ne le sait que si plan.json a deja ete vu dans cette
+     session ; sinon on reste prudent, jamais affirmatif. */
+  const vide = (PLAN_DEFAULT && PLAN_DEFAULT.plan) ? (arr(PLAN_DEFAULT.plan.weeks).length === 0) : null;
+  const lignes = ["Ton plan importé sera supprimé de cet appareil et remplacé par plan.json."];
+  if(vide === true) lignes.push("⚠ Le plan par défaut ne contient aucune semaine : tu te retrouveras sans plan sur cet appareil, jusqu'à ce que tu en importes un autre.");
+  else if(vide === null) lignes.push("Si le plan par défaut ne contient aucune semaine, tu te retrouveras sans plan sur cet appareil, jusqu'à ce que tu en importes un autre.");
+  /* B4 : le plan par defaut n'a aucune raison de porter les cartes de
+     vigilance du plan actif. CLAUDE.md : jamais de disparition silencieuse
+     d'une alerte sante -- on les NOMME avant, comme a l'import d'un plan. */
+  const vig = (PLAN_DEFAULT && PLAN_DEFAULT.plan) ? vigilanceWarning(PLAN_DEFAULT.plan) : "";
+  if(vig) vig.split("\n").forEach(function(l){ lignes.push(l); });
+  else if(!(PLAN_DEFAULT && PLAN_DEFAULT.plan) && careTitles(PLAN).length)
+    lignes.push("⚠ Le plan par défaut n'a pas encore été lu dans cette session : s'il ne contient pas tes cartes de vigilance, elles disparaîtront.");
+  lignes.push("Une connexion est nécessaire pour le retélécharger : si elle échoue, ton plan importé est conservé.");
+  lignes.push("Tes coches, ton journal et tes courses ne sont pas touchés.");
   const go = await askConfirm({
     title: "Revenir au plan par défaut ?",
-    lines: [
-      "Ton plan importé sera supprimé de cet appareil et remplacé par plan.json.",
-      "Une connexion est nécessaire pour le retélécharger : si elle échoue, ton plan importé est conservé.",
-      "Tes coches, ton journal et tes courses ne sont pas touchés."
-    ],
+    lines: lignes,
     okLabel: "Revenir au plan par défaut",
     cancelLabel: "Annuler",
     danger: true
@@ -2532,18 +2812,30 @@ $("planreset").addEventListener("click", async function(){
   // rendrait l'ancien plan importe au prochain lancement : on ne peut pas
   // annoncer « rétabli ✓ ».
   const retire = await sdel("plan-override");
+  /* Retrait enregistre : un plan importe NON enregistre n'a plus rien a
+     perdre -- on leve SON echec, et lui seul. Pas noteWrite(), qui leverait
+     aussi l'echec de la sonde : un retrait ne prouve pas qu'on peut ecrire
+     (la pierre tombale peut etre deja posee, ou inutile). La cle n'est plus
+     illisible non plus : elle n'existe plus. */
+  if(retire){
+    delete writeFailed["plan-override"];
+    delete readFailed["plan-override"];
+    refreshSaveFailed();
+    renderSaveBanner();
+  }
   try{ await sset("plan-cache", def); }catch(e){}
   applyPlan(def, "default");
   PLAN_PENDING_OVERRIDE = null;
   renderAll();
   if(retire){
-    planMsg("Plan par défaut rétabli (v"+def.version+").", "ok");
+    planMsg("Plan par défaut rétabli (v"+def.version+")."
+      + (arr(def.weeks).length ? "" : " Il ne contient aucune semaine : importe un plan pour retrouver des séances."), "ok");
     toast("Plan par défaut rétabli ✓");
   } else {
     planMsg("Plan par défaut affiché (v"+def.version+") MAIS le retrait de ton plan importé N'A PAS ÉTÉ ENREGISTRÉ : le stockage de cet appareil a refusé d'écrire.\n"
-      + "Ton plan importé réapparaîtra au prochain lancement. Libère de l'espace (Réglages › Safari › Données de sites), sors de la navigation privée, puis recommence.\n"
+      + "Ton plan importé peut réapparaître au prochain lancement. Libère de l'espace (Réglages › Safari › Données de sites), sors de la navigation privée, puis recommence.\n"
       + "Tes coches, ton journal et tes courses ne sont pas concernés.", "err");
-    toast("⚠ Retrait NON enregistré — ton plan importé reviendra au prochain lancement. Libère de l'espace.", 7000);
+    toast("⚠ Retrait NON enregistré — ton plan importé peut revenir au prochain lancement. Libère de l'espace.", 7000);
   }
 });
 
@@ -3548,7 +3840,11 @@ $("btnexport").addEventListener("click", async function(){
   const dur = missing.length ? 7000 : 1800;
   if(navigator.clipboard){ navigator.clipboard.writeText(str).then(function(){toast(okMsg||"Export copié 📋", dur);}).catch(function(){toast(okMsg||"Export prêt — copie le texte", dur);}); }
   else { toast(okMsg||"Export prêt — copie le texte", dur); }
-  const nom = missing.length ? "suquet-sauvegarde-INCOMPLETE.json" : "suquet-sauvegarde.json";
+  /* Le nom du fichier ne porte QUE l'identifiant de profil -- deja contraint a
+     [a-z0-9-], donc sans espace ni accent -- et la date. Jamais le nom affiche
+     du coureur : un ami ne telecharge plus un fichier au nom d'Enzo. */
+  const nom = "sauvegarde-" + (PROFILE_ID || "profil") + "-" + todayISO()
+    + (missing.length ? "-INCOMPLETE" : "") + ".json";
   try{ const blob=new Blob([str],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=nom; a.click(); setTimeout(function(){URL.revokeObjectURL(url);},1000); }catch(e){}
   /* Date du dernier export, pour le rappel de sauvegarde. UNIQUEMENT si
      l'export est COMPLET : un fichier marque « incomplet » ne protege pas ce
@@ -3560,6 +3856,56 @@ $("btnexport").addEventListener("click", async function(){
     try{ await renderBackupNote(); }catch(e){}
   }
 });
+/* DECOMPTES DE L'IMPORT DE SAUVEGARDE.
+   Regle : on ne compte QUE ce qu'on sait compter. Chaque fonction rend null
+   quand la valeur n'est pas exploitable -- l'appelant n'affiche alors AUCUN
+   nombre, plutot qu'un nombre faux. */
+function countDone(o){
+  return isPlainObject(o) ? Object.keys(o).filter(function(k){ return o[k] === true; }).length : null;
+}
+/* Meme definition d'« entree » que renderJournal : une entree vide de tout
+   contenu ne s'affiche nulle part, elle ne doit donc pas etre comptee ici. */
+function countLog(o){
+  if(!isPlainObject(o)) return null;
+  return Object.keys(o).filter(function(k){
+    const e = o[k];
+    return !!(e && (e.feel || e.metric || e.note || e.sleep || e.rhr || (e.pain && e.pain.length)));
+  }).length;
+}
+function countRaces(a){ return Array.isArray(a) ? a.length : null; }
+/* tgcm-done a TROIS etats : `false` = seance explicitement PAS faite. Ce n'est
+   ni une coche ni une absence : on le compte a part, sous son nom. */
+function countUndone(o){
+  return isPlainObject(o) ? Object.keys(o).filter(function(k){ return o[k] === false; }).length : 0;
+}
+function undoneSuffix(f){ return f ? " · " + f + " décochée" + (f > 1 ? "s" : "") : ""; }
+function decocheUnite(f){ return f + (f > 1 ? " séances décochées" : " séance décochée"); }
+/* D4 : la cle locale que l'import va reecrire porte-t-elle QUOI QUE CE SOIT ?
+   Pas seulement des coches : un decochage explicite, une entree vide, tout
+   ce qui sera ecrase. Illisible : on ne sait pas, donc on previent. */
+function localHasContent(k){
+  if(readFailed[k]) return true;
+  const v = (k === "tgcm-done") ? done : (k === "tgcm-log" ? log : userRaces);
+  if(Array.isArray(v)) return v.length > 0;
+  if(isPlainObject(v)) return Object.keys(v).length > 0;
+  return v !== undefined && v !== null;
+}
+/* Ce qui est SUR CET APPAREIL. Une cle qui n'a pas pu etre lue au demarrage
+   n'a pas de decompte : null, et on se taira. */
+function countLocal(k){
+  if(readFailed[k]) return null;
+  if(k === "tgcm-done") return countDone(done);
+  if(k === "tgcm-log") return countLog(log);
+  return countRaces(userRaces);
+}
+const IMPORT_TITRE = {"tgcm-done":"Séances cochées", "tgcm-log":"Journal", "tgcm-races":"Courses"};
+const IMPORT_UNITE = {
+  "tgcm-done":  ["séance cochée", "séances cochées"],
+  "tgcm-log":   ["entrée", "entrées"],
+  "tgcm-races": ["course", "courses"]
+};
+function importUnite(k, n){ return n + " " + IMPORT_UNITE[k][n > 1 ? 1 : 0]; }
+
 $("btnimport").addEventListener("click", async function(){
   const raw=$("iobox").value.trim(); if(!raw){ toast("Colle d'abord un export"); return; }
   let data; try{ data=JSON.parse(raw); }catch(e){ toast("Format invalide ✗"); return; }
@@ -3580,49 +3926,171 @@ $("btnimport").addEventListener("click", async function(){
       : "Sauvegarde invalide : ni coches, ni journal, ni courses, ni plan ✗", 5000);
     return;
   }
-  if(unread.length){
-    const manque = unread.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ");
-    const go = await askConfirm({
-      title: "⚠ Sauvegarde incomplète",
-      lines: [
-        "Ce fichier est marqué « incomplet ». Il ne contient pas : " + manque + ".",
-        "Ces données ne seront PAS restaurées : ce que tu as actuellement sur cet appareil est conservé tel quel.",
-        "Le reste de la sauvegarde sera importé normalement."
-      ],
-      okLabel: "Importer quand même",
-      cancelLabel: "Annuler",
-      danger: true
-    });
-    if(!go){ toast("Import annulé", 4000); return; }
+  /* ------------------------------------------------------------------
+     B2/B3 + defaut preexistant : RIEN N'EST ECRIT AVANT L'ACCORD.
+     On decide d'abord ce qui se passerait, on l'annonce, on ecrit ensuite.
+     Le plan d'une sauvegarde passe par les MEMES regles que « Mettre à jour
+     le plan » : safeValid, puis importRefus (aucune semaine = refus), puis
+     le garde-fou de vigilance.
+     ------------------------------------------------------------------ */
+  let planAction = "";           // "" (aucun plan) | "skip" | "apply"
+  let planNote = "";
+  let planMotif = "";            // motif du refus direct (D1), si rien d'autre n'est a ecrire
+  const planLignes = [];
+  if(data.plan !== undefined && data.plan !== null){
+    let v;
+    try{ v = safeValid(data.plan); }
+    catch(e){ v = {ok:false, errors:[String(e)]}; }
+    const refus = v.ok ? importRefus(data.plan) : "";
+    if(!v.ok){
+      planAction = "skip";
+      planNote = " (plan de la sauvegarde ignoré : invalide)";
+      planMotif = "plan de la sauvegarde invalide";
+      planLignes.push("Le plan de cette sauvegarde est invalide : il est ignoré, ton plan actuel reste en place.");
+    } else if(refus){
+      // B2 : un plan sans semaine est VALIDE pour l'app mais ne doit pas
+      // remplacer le plan affiche -- meme refus que par la porte d'entree.
+      planAction = "skip";
+      planNote = " (plan de la sauvegarde ignoré : aucune semaine)";
+      planMotif = "plan de la sauvegarde sans aucune semaine";
+      planLignes.push("Le plan de cette sauvegarde ne contient aucune semaine : il est ignoré, ton plan actuel reste en place.");
+    } else if(data.planSource === "default"){
+      // B7 : la sauvegarde portait le plan par defaut -> ne pas creer d'override.
+      planAction = "skip";
+      planNote = " (plan par défaut de la sauvegarde : pas d'override créé)";
+      planMotif = "la sauvegarde porte le plan par défaut (aucun plan importé à créer)";
+      planLignes.push("Cette sauvegarde portait le plan par défaut : aucun plan importé ne sera créé.");
+    } else {
+      planAction = "apply";
+      planNote = " + plan v"+data.plan.version;
+      // Remplacer un plan importe n'est vrai que s'il y en a un. Un plan
+      // importe conserve mais ignore (PLAN_PENDING_OVERRIDE) est lui aussi
+      // ecrase par cette ecriture : on le nomme.
+      // M6 : un plan importe qu'on n'a pas su lire au lancement est ecrase
+      // lui aussi -- meme regle que les trois cles (D4) : illisible, on previent.
+      planLignes.push(PLAN_SOURCE === "override"
+        ? "Plan : ton plan actuel sera remplacé par le plan v"+data.plan.version+" de la sauvegarde."
+        : (PLAN_PENDING_OVERRIDE
+          ? "Plan : ton plan importé v"+PLAN_PENDING_OVERRIDE.override+", conservé mais ignoré, sera remplacé par le plan v"+data.plan.version+" de la sauvegarde."
+          : (readFailed["plan-override"]
+            ? "Plan : ce qui est enregistré ici comme plan importé n'a pas pu être lu ; ce sera remplacé par le plan v"+data.plan.version+" de la sauvegarde."
+            : "Plan : le plan v"+data.plan.version+" de la sauvegarde sera importé sur cet appareil.")));
+      /* B3 : une sauvegarde ne fait pas disparaitre une carte de vigilance en
+         silence (CLAUDE.md). Meme garde-fou que l'onglet Zones. */
+      const vig = vigilanceWarning(data.plan);
+      if(vig) vig.split("\n").forEach(function(l){ planLignes.push(l); });
+    }
   }
+
+  /* D1 : RIEN A ECRIRE -> PAS DE MODALE. Aucune cle exploitable et un plan
+     qui sera ignore : la modale promettait une ecriture, bouton rouge
+     « Importer et remplacer » compris, pour un import qui n'ecrit rien. Refus
+     direct, avec le motif, et aucune ecriture. (Sans plan du tout, la garde
+     ci-dessus a deja refuse.) */
+  if(!hasDone && !hasLog && !hasRaces && planAction !== "apply"){
+    const motifs = [];
+    if(planMotif) motifs.push(planMotif);
+    motifs.push(unread.length
+      ? "sauvegarde incomplète, sans coches, journal ni courses exploitables"
+      : "ni coches, ni journal, ni courses");
+    toast("Rien à importer : " + motifs.join(" ; ") + ". Rien n'a été modifié ✗", 6000);
+    return;
+  }
+
+  /* D4 : la phrase de perte n'est vraie que s'il y a quelque chose a perdre.
+     Sur un appareil vierge -- exactement le cas d'une RESTAURATION -- rien
+     n'est ecrase, et l'annoncer serait faux. « Quelque chose a perdre » :
+     une cle qui sera reellement reecrite et qui porte deja un contenu
+     QUELCONQUE ici -- un decochage explicite (`false`) compris -- ou dont on
+     n'a pas su lire le contenu (dans le doute, on previent), ou un plan
+     importe deja enregistre (actif, ou conserve mais ignore) que ce plan-ci
+     remplacerait. */
+  const ecrase = [["tgcm-done", hasDone], ["tgcm-log", hasLog], ["tgcm-races", hasRaces]]
+    .some(function(e){ return e[1] && localHasContent(e[0]); })
+    || (planAction === "apply" && (PLAN_SOURCE === "override" || !!PLAN_PENDING_OVERRIDE || !!readFailed["plan-override"]));
+  const lignes = [ecrase
+    ? "Cet import REMPLACE les données de cet appareil par celles de la sauvegarde. Ce qui est remplacé ne peut pas être récupéré."
+    : "Cet import écrit les données de la sauvegarde sur cet appareil."];
+  if(unread.length)
+    lignes.push("Ce fichier est marqué « incomplet » : il ne contient pas " + unread.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ")
+      + ". Ces données ne seront PAS restaurées — ce que tu as ici est conservé tel quel.");
+  [["tgcm-done", hasDone, data.done], ["tgcm-log", hasLog, data.log], ["tgcm-races", hasRaces, data.races]]
+    .forEach(function(e){
+      const k = e[0];
+      if(!e[1]) return;
+      const n = (k === "tgcm-done") ? countDone(e[2]) : (k === "tgcm-log" ? countLog(e[2]) : countRaces(e[2]));
+      if(n === null) return;                       // decompte illisible : on se tait
+      const ici = countLocal(k);
+      // Decochages explicites (`false`) : comptes a part, sur leur propre
+      // ligne, jamais comme des « séances cochées ».
+      const fIci = (k === "tgcm-done" && ici !== null) ? countUndone(done) : 0;
+      const fSauv = (k === "tgcm-done") ? countUndone(e[2]) : 0;
+      // D4 : « 0 course ici → 0 course de la sauvegarde » n'apprend rien a
+      // personne. Rien ici, rien la-bas : pas de ligne.
+      if(!(ici === 0 && n === 0)) lignes.push(ici === null
+        ? IMPORT_TITRE[k] + " : ce qui est ici (le nombre actuel n'a pas pu être lu) sera remplacé par " + importUnite(k, n) + undoneSuffix(fSauv) + " de la sauvegarde."
+        : IMPORT_TITRE[k] + " : " + importUnite(k, ici) + " sur cet appareil → " + importUnite(k, n) + " de la sauvegarde.");
+      if(ici !== null && (fIci || fSauv))
+        lignes.push("Séances décochées : " + decocheUnite(fIci) + " sur cet appareil → " + decocheUnite(fSauv) + " de la sauvegarde.");
+    });
+  /* « Absent » ne vaut QUE pour ce qui manque vraiment : une cle marquee
+     illisible A L'EXPORT est deja traitee par la ligne « incomplet » ci-dessus,
+     la redire absente serait faux. */
+  const intacts = [["tgcm-done", hasDone], ["tgcm-log", hasLog], ["tgcm-races", hasRaces]]
+    .filter(function(e){ return !e[1] && unread.indexOf(e[0]) < 0; })
+    .map(function(e){ return USER_KEY_LABEL[e[0]]; });
+  if(intacts.length) lignes.push("Absent de la sauvegarde, donc inchangé ici : " + intacts.join(", ") + ".");
+  planLignes.forEach(function(l){ lignes.push(l); });
+  const askEtat = {};
+  const go = await askConfirm({
+    title: "Importer cette sauvegarde ?",
+    lines: lignes,
+    okLabel: "Importer et remplacer",
+    cancelLabel: "Annuler",
+    danger: true,
+    state: askEtat
+  });
+  // D5 : un double clic sur « Importer » ferme la premiere modale pour ouvrir
+  // la seconde. Rien n'est ecrit (c'est la regle de la modale), mais annoncer
+  // « Import annulé » pendant que la modale suivante s'affiche serait
+  // contredire l'ecran. On se tait : Enzo a toujours la main.
+  if(!go){
+    if(askEtat.cause !== "superseded") toast("Import annulé — rien n'a été modifié sur cet appareil", 4000);
+    return;
+  }
+
   if(hasDone) done=data.done;
   if(hasLog) log=data.log;
   if(hasRaces) userRaces=data.races;
-  let okSave = true;
+  /* D1/D2 : on retient CLE PAR CLE ce qui a ete enregistre et ce qui ne l'a
+     pas ete. « Données importées ✓ » ne doit plus couvrir ni une ecriture
+     partielle, ni un import ou rien n'a ete ecrit du tout. */
+  const ecrites = [], ratees = [];
   // Restauration EXPLICITE : seul cas ou l'on accepte d'ecrire par-dessus une
   // cle illisible. On ne force QUE les cles REELLEMENT fournies par la
   // sauvegarde : une cle absente (ou marquee illisible a l'export) ne doit
   // jamais etre ecrasee par la valeur vide qu'on a en memoire.
-  if(hasDone  && !(await saveUser("tgcm-done", done, null, true))) okSave = false;
-  if(hasLog   && !(await saveUser("tgcm-log", log, null, true))) okSave = false;
-  if(hasRaces && !(await saveUser("tgcm-races", userRaces, null, true))) okSave = false;
-  // Sauvegardes anciennes (sans champ `plan`) : toujours supportées, on ne touche pas au plan actif.
-  let planNote = "";
-  if(data.plan!==undefined && data.plan!==null){
-    let v;
-    try{ v = safeValid(data.plan); }
-    catch(e){ v = {ok:false, errors:[String(e)]}; }
-    if(!v.ok){
-      planNote = " (plan de la sauvegarde ignoré : invalide)";
-    } else if(data.planSource === "default"){
-      // B7 : la sauvegarde portait le plan par defaut -> ne pas creer d'override.
-      planNote = " (plan par défaut de la sauvegarde : pas d'override créé)";
-    } else {
-      if(!(await sset("plan-override", data.plan))) okSave = false;
-      applyPlan(data.plan, "override");
-      PLAN_PENDING_OVERRIDE = null;
-      planNote = " + plan v"+data.plan.version;
-    }
+  if(hasDone)  ((await saveUser("tgcm-done", done, null, true))       ? ecrites : ratees).push("tgcm-done");
+  if(hasLog)   ((await saveUser("tgcm-log", log, null, true))         ? ecrites : ratees).push("tgcm-log");
+  if(hasRaces) ((await saveUser("tgcm-races", userRaces, null, true)) ? ecrites : ratees).push("tgcm-races");
+  // Sauvegardes anciennes (sans champ `plan`) : toujours supportées, on ne
+  // touche pas au plan actif. Le tri a ete fait AVANT la confirmation.
+  if(planAction === "apply"){
+    const planEcrit = (await sset("plan-override", data.plan)) === true;
+    applyPlan(data.plan, "override");
+    PLAN_PENDING_OVERRIDE = null;
+    /* D2 : le plan passe par le MEME suivi que les trois cles -- rangé sous
+       « Enregistré » ou « NON enregistré », bandeau leve en cas d'echec, et
+       la ligne de version ne le dit plus « importé » tout court. */
+    noteWrite("plan-override", planEcrit);
+    renderSaveBanner();
+    (planEcrit ? ecrites : ratees).push("plan-override");
+    // Ecrit : ce qui est enregistre est desormais connu (plus « illisible »).
+    if(planEcrit) delete readFailed["plan-override"];
+    if(planEcrit) planMsg("");
+    else planMsg("Plan v"+data.plan.version+" de la sauvegarde appliqué MAIS NON ENREGISTRÉ : espace de stockage insuffisant.\n"
+      + "Il disparaîtra au prochain lancement de l'app. Libère de l'espace (Réglages › Safari › Données de sites), "
+      + "puis réimporte la sauvegarde.", "err");
   }
   renderAll();
   // Un export partiel ne doit pas non plus passer pour complet A LA REIMPORTATION.
@@ -3630,8 +4098,27 @@ $("btnimport").addEventListener("click", async function(){
     ? " — sauvegarde incomplète, non restauré : "+unread.map(function(k){ return USER_KEY_LABEL[k]; }).join(", ")
     : "";
   const reste = READ_BROKEN ? " — ⚠ toujours illisible ici : "+brokenKeysLabel() : "";
-  if(okSave) toast("Données importées ✓"+planNote+absent+reste, (absent||reste) ? 7000 : 1800);
-  else toast("Import appliqué mais NON enregistré — stockage plein"+planNote, 7000);
+  const nomme = function(l){ return l.map(function(k){
+    return k === "plan-override" ? "le plan v"+data.plan.version+" de la sauvegarde" : USER_KEY_LABEL[k];
+  }).join(", "); };
+  // Le cas « rien a ecrire » a ete refuse AVANT la modale (D1) : ici, au
+  // moins une ecriture a ete tentee.
+  if(!ratees.length){
+    toast("Données importées ✓"+planNote+absent+reste, (absent||reste) ? 7000 : 1800);
+  } else {
+    /* D2 : on nomme ce qui est enregistre ET ce qui ne l'est pas -- le plan
+       compris. Generaliser dans un sens ou dans l'autre serait faux :
+       l'appareil porte desormais un melange, et le bandeau #savealert, leve
+       par tout echec (cle ou plan), reste affiche pour le rappeler. */
+    const dit = [];
+    if(ecrites.length) dit.push("Enregistré : "+nomme(ecrites)+".");
+    dit.push("NON enregistré : "+nomme(ratees)+" — stockage plein.");
+    if(unread.length) dit.push("Sauvegarde incomplète, non restauré : "+nomme(unread)+".");
+    if(READ_BROKEN) dit.push("Toujours illisible ici : "+brokenKeysLabel()+".");
+    if(planAction === "skip") dit.push(planNote.trim());
+    dit.push("Exporte tes données.");
+    toast("⚠ "+dit.join(" "), 9000);
+  }
 });
 
 /* ======================================================================
@@ -3964,7 +4451,7 @@ async function legacyStillReadable(){
 function resetSessionAfterWipe(){
   done = {}; log = {}; userRaces = [];
   mem = {}; readFailed = {}; unsavedDays = {};
-  SAVE_FAILED = false; READ_BROKEN = false;
+  SAVE_FAILED = false; writeFailed = {}; probeFailed = false; READ_BROKEN = false;
   TOMBS = null;
   LEGACY_OWNER = false;                 // relu depuis le stockage juste apres
   PROFILE_NAME = "";
